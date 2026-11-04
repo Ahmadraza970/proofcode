@@ -44,7 +44,7 @@ async function main() {
   form.append("file", new Blob([await fs.readFile(tmpZip)], { type: "application/zip" }), `fixture-${Date.now()}.zip`);
   await fs.rm(tmpZip, { force: true });
 
-  const created = await json(`${BASE}/api/v1/projects`, { method: "POST", body: form });
+  const created = await json(`${BASE}/api/v1/projects`, { method: "POST", headers: auth, body: form });
   if (created.status !== 201) {
     console.error("PROJECT CREATION FAILED", created);
     return;
@@ -98,13 +98,13 @@ async function main() {
   check("tests recorded", Array.isArray(verified.body.tests) && verified.body.tests.length > 0);
 
   // 6. fetch full project
-  const got = await json(`${BASE}/api/v1/projects/${projectId}`);
+  const got = await json(`${BASE}/api/v1/projects/${projectId}`, { headers: auth });
   check("project fetch", got.status === 200 && got.body.id === projectId);
   check("xss issue closed", got.body.issues.find((i) => i.id === xssIssue.id)?.status === "fixed");
   check("health risen", got.body.health < 90, `health=${got.body.health}`);
 
   // 7. cleanup
-  const del = await json(`${BASE}/api/v1/projects/${projectId}`, { method: "DELETE" });
+  const del = await json(`${BASE}/api/v1/projects/${projectId}`, { method: "DELETE", headers: auth });
   check("cleanup delete", del.status === 200 && del.body.ok === true);
 
   console.log(failed === 0 ? "\nE2E: ALL PASS" : `\nE2E: ${failed} FAILURE(S)`);
