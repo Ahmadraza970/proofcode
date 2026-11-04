@@ -1,88 +1,165 @@
 "use client";
 
-import { Info, Lock, UserRound, Zap } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+  Copy,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Palette,
+  UserRound,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { CURRENT_USER } from "@/lib/mock-data";
+import { fetchToken } from "@/lib/api/client";
 
 export default function SettingsPage() {
-  const user = CURRENT_USER;
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+  const [showToken, setShowToken] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchToken()
+      .then((value) => {
+        if (!cancelled) setToken(value);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setTokenError(
+            err instanceof Error ? err.message : "Could not load the API token",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const copyToken = async () => {
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      toast.success("API token copied");
+    } catch {
+      toast.error("Copy failed — select the token and copy it manually");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Settings"
-        description="Profile and preferences for your ProofCode workspace."
+        description="Preferences and API access for your ProofCode workspace."
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Profile */}
-        <Card>
-          <CardContent className="p-5">
-            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              <UserRound className="size-4" aria-hidden="true" />
-              Profile
-            </h2>
-            <div className="mt-4 flex items-center gap-4">
-              <Avatar className="size-14">
-                <AvatarFallback className="bg-brand/15 text-base font-semibold text-brand">
-                  {user.initials}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-muted-foreground">{user.email}</p>
-              </div>
-            </div>
-            <Separator className="my-4" />
-            <p className="text-xs text-muted-foreground">
-              This is a demo workspace. Authentication and profile persistence are
-              out of scope for the hackathon MVP.
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Preferences */}
         <Card>
           <CardContent className="p-5">
             <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              <Zap className="size-4" aria-hidden="true" />
+              <Palette className="size-4" aria-hidden="true" />
               Preferences
             </h2>
-            <div className="mt-4 flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <div className="mt-4 flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-medium">Appearance</p>
-                <p className="text-xs text-muted-foreground">
-                  Light is the default; dark follows your saved choice.
+                <p className="text-sm font-medium">Theme</p>
+                <p className="text-sm text-muted-foreground">
+                  Switch between light and dark appearance.
                 </p>
               </div>
               <ThemeToggle />
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Demo note */}
-      <Card className="border-brand/25 bg-brand-dim/20">
-        <CardContent className="flex items-start gap-3 p-5">
-          <Lock className="mt-0.5 size-5 shrink-0 text-brand" aria-hidden="true" />
-          <div>
-            <h2 className="flex items-center gap-2 font-semibold text-brand">
-              <Info className="size-4" aria-hidden="true" />
-              About this build
+        {/* Accounts */}
+        <Card>
+          <CardContent className="p-5">
+            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              <UserRound className="size-4" aria-hidden="true" />
+              Accounts
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              ProofCode verifies real codebases end to end: upload or clone,
-              static analysis, deterministic and AI-assisted fixes, re-scan, and
-              test execution. The demo workflow runs on realistic sample data so
-              you can explore every screen instantly.
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              Sign-in accounts are coming later. For now, ProofCode runs in a
+              local workspace: your projects are stored on the server and
+              identified by the API token below, not by a personal account.
             </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+        {/* API access */}
+        <Card className="lg:col-span-2">
+          <CardContent className="p-5">
+            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              <KeyRound className="size-4" aria-hidden="true" />
+              API access
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              This token authorises API calls that change data — creating,
+              analyzing, fixing, verifying and deleting projects. Keep it
+              private and do not share it or commit it to a repository.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Input
+                readOnly
+                value={
+                  tokenError
+                    ? ""
+                    : token === null
+                      ? ""
+                      : showToken
+                        ? token
+                        : "•".repeat(Math.min(token.length, 32))
+                }
+                placeholder={
+                  tokenError ?? (token === null ? "Loading token…" : "")
+                }
+                aria-label="API token"
+                className="font-mono text-xs"
+              />
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowToken((value) => !value)}
+                  disabled={!token}
+                >
+                  {showToken ? (
+                    <EyeOff className="size-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="size-4" aria-hidden="true" />
+                  )}
+                  {showToken ? "Hide" : "Show"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void copyToken()}
+                  disabled={!token}
+                >
+                  {token === null && !tokenError ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Copy className="size-4" aria-hidden="true" />
+                  )}
+                  Copy
+                </Button>
+              </div>
+            </div>
+            {tokenError && (
+              <p className="mt-2 text-sm text-critical" role="alert">
+                Could not load the API token: {tokenError}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

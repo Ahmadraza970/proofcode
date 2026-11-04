@@ -1,77 +1,110 @@
 "use client";
 
-import { useMemo } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
-import { toast } from "sonner";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   CheckCircle2,
   FileCode2,
   Flame,
   Lightbulb,
+  Loader2,
   ShieldCheck,
   Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { FixPanel } from "@/components/fix/FixPanel";
 import { CodeBlock } from "@/components/shared/CodeBlock";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { SeverityBadge } from "@/components/shared/SeverityBadge";
 import { WorkflowStrip } from "@/components/shared/WorkflowStrip";
-import { useProof } from "@/lib/store";
+import {
+  getProjectLive,
+  listFullProjects,
+  type ApiProject,
+} from "@/lib/api/client";
+import type { ApiIssue } from "@/lib/api/types";
 
-/** Finds the offending line in a BEFORE snippet for a light highlight. */
-function dangerLine(code: string): number[] {
-  const markers = /unsafe|dangerous|may throw|swallowed|no timeout|unvalidated|appears unused/g;
-  const lines = code.split("\n");
-  const index = lines.findIndex((line) => markers.test(line));
-  return index >= 0 ? [index + 1] : [];
+interface Located {
+  project: ApiProject;
+  issue: ApiIssue;
 }
 
-export default function IssueDetailPage() {
+function IssueDetailContent() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
-  const projectId = searchParams.get("project") ?? "snapcart-api";
-  const { state, getProject, getIssue, startFix, completeFix, dismissIssue } =
-    useProof();
-  const router = useRouter();
+  const projectHint = searchParams.get("project");
 
-  const issue = useMemo(
-    () => getIssue(projectId, params.id),
-    [getIssue, projectId, params.id],
-  );
-  const project = getProject(projectId);
+  const [located, setLocated] = useState<Located | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const fixing = state.fixJob?.status === "running" && issue?.status === "fixing";
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // Fast path: the linking page usually knows the owning project.
+        if (projectHint) {
+          try {
+            const project = await getProjectLive(projectHint);
+            const issue = project.issues.find((i) => i.id === params.id);
+            if (issue) {
+              if (!cancelled) setLocated({ project, issue });
+              return;
+            }
+          } catch {
+            // Fall through to the full scan of projects.
+          }
+        }
+        const projects = await listFullProjects();
+        for (const project of projects) {
+          const issue = project.issues.find((i) => i.id === params.id);
+          if (issue) {
+            if (!cancelled) setLocated({ project, issue });
+            return;
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Could not load the issue");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.id, projectHint]);
 
-  const handleGenerateFix = useCallback(() => {
-    if (!project || !issue) return;
-    startFix(project.id, issue.id);
-  }, [project, issue, startFix]);
+  if (loading) {
+    return (
+      <div
+        className="flex items-center justify-center gap-3 py-24 text-muted-foreground"
+        aria-busy="true"
+      >
+        <Loader2 className="size-5 animate-spin text-brand" aria-hidden="true" />
+        <p className="text-sm">Loading issue…</p>
+      </div>
+    );
+  }
 
-  const handleCompleteFix = useCallback(() => {
-    if (!project || !issue) return;
-    completeFix(project.id, issue.id);
-    router.push("/verify");
-  }, [project, issue, completeFix, router]);
+  if (error) {
+    return (
+      <ErrorState title="Could not load this issue" description={error}>
+        <Button asChild>
+          <Link href="/projects">All projects</Link>
+        </Button>
+      </ErrorState>
+    );
+  }
 
-  const handleDismiss = useCallback(() => {
-    if (!project || !issue) return;
-    dismissIssue(project.id, issue.id);
-    toast("Issue dismissed.", {
-      description: "It is removed from the report but kept in project history.",
-    });
-    router.push(`/report/${project.id}`);
-  }, [project, issue, dismissIssue, router]);
-
-  if (!project || !issue) {
+  if (!located) {
     return (
       <ErrorState
         title="Issue not found"
-        description="The issue you opened does not exist or belongs to a different report."
+        description="The issue you opened does not exist in any analyzed project."
       >
         <Button asChild>
           <Link href="/projects">All projects</Link>
@@ -80,6 +113,7 @@ export default function IssueDetailPage() {
     );
   }
 
+  const { project, issue } = located;
   const isFixed = issue.status === "fixed";
 
   return (
@@ -109,7 +143,15 @@ export default function IssueDetailPage() {
         )}
       </div>
 
-      <PageHeading issue={issue} />
+      <div>
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+          <FileCode2 className="hidden size-6 text-brand sm:block" aria-hidden="true" />
+          {issue.title}
+        </h1>
+        <p className="mt-1 font-mono text-sm text-muted-foreground">
+          {issue.fileName}:{issue.line}
+        </p>
+      </div>
 
       {isFixed ? (
         <Card className="border-verify/30 bg-verify-dim/30">
@@ -117,25 +159,18 @@ export default function IssueDetailPage() {
             <div>
               <h2 className="flex items-center gap-2 font-semibold text-verify">
                 <ShieldCheck className="size-5" aria-hidden="true" />
-                Fix applied & verified
+                Fix applied
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                This issue was resolved and its regression test passed.
+                This issue was resolved in the project workspace. Run a
+                verification from the report to record the result.
               </p>
             </div>
             <Button asChild>
-              <Link href="/verify">View Verification</Link>
+              <Link href={`/verify?live=${project.id}`}>View Verification</Link>
             </Button>
           </CardContent>
         </Card>
-      ) : fixing ? (
-        <>
-          <FixPanel onComplete={handleCompleteFix} />
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Flame className="size-4 text-brand" aria-hidden="true" />
-            Keep this window open — the fix is applied and verified automatically.
-          </p>
-        </>
       ) : (
         <>
           {/* Explanation */}
@@ -171,9 +206,12 @@ export default function IssueDetailPage() {
                   <CardContent className="p-4">
                     <p className="text-sm font-medium">Recommended Fix</p>
                     <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                      Replace the inline query with a parameterized statement and
-                      validate the id before it ever reaches the database. A
-                      regression test is generated alongside the patch.
+                      {issue.fixSuggested ??
+                        (issue.fixAvailable === "auto"
+                          ? "A deterministic patch is available for this finding — apply it from the project report and ProofCode will re-scan the line to confirm."
+                          : issue.fixAvailable === "llm"
+                            ? "An AI-assisted fix is available for this finding — apply it from the project report and ProofCode will re-scan the line to confirm."
+                            : "This finding has no automatic fix. Adjust the code by hand, then re-run the analysis from the project report.")}
                     </p>
                   </CardContent>
                 </Card>
@@ -181,25 +219,25 @@ export default function IssueDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Diff */}
-          <section aria-label="Proposed diff">
-            <div className="grid gap-4 lg:grid-cols-2">
-              <CodeBlock
-                code={issue.before}
-                header="Before"
-                highlightLines={dangerLine(issue.before)}
-              />
-              <CodeBlock code={issue.after} header="After" />
-            </div>
-          </section>
+          {/* Code, when recorded */}
+          {issue.before && (
+            <section aria-label="Flagged code">
+              <div className="grid gap-4 lg:grid-cols-2">
+                <CodeBlock code={issue.before} header="Flagged line" highlightLines={[1]} />
+                {issue.after && <CodeBlock code={issue.after} header="After fix" />}
+              </div>
+            </section>
+          )}
 
           <div className="flex flex-col gap-3 sm:flex-row">
-            <Button size="lg" className="h-11 flex-1 px-6" onClick={handleGenerateFix}>
-              <Wrench className="size-4" aria-hidden="true" />
-              Generate Fix
+            <Button asChild size="lg" className="h-11 flex-1 px-6">
+              <Link href={`/report/${project.id}`}>
+                <Wrench className="size-4" aria-hidden="true" />
+                Fix this in the project report
+              </Link>
             </Button>
-            <Button size="lg" variant="outline" className="h-11 px-6" onClick={handleDismiss}>
-              Dismiss
+            <Button asChild size="lg" variant="outline" className="h-11 px-6">
+              <Link href={`/projects/${project.id}`}>Project detail</Link>
             </Button>
           </div>
         </>
@@ -212,16 +250,20 @@ export default function IssueDetailPage() {
   );
 }
 
-function PageHeading({ issue }: { issue: { title: string; fileName: string; line: number } }) {
+export default function IssueDetailPage() {
   return (
-    <div>
-      <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-        <FileCode2 className="hidden size-6 text-brand sm:block" aria-hidden="true" />
-        {issue.title}
-      </h1>
-      <p className="mt-1 font-mono text-sm text-muted-foreground">
-        {issue.fileName}:{issue.line}
-      </p>
-    </div>
+    <Suspense
+      fallback={
+        <div
+          className="flex items-center justify-center gap-3 py-24 text-muted-foreground"
+          aria-busy="true"
+        >
+          <Loader2 className="size-5 animate-spin text-brand" aria-hidden="true" />
+          <p className="text-sm">Loading issue…</p>
+        </div>
+      }
+    >
+      <IssueDetailContent />
+    </Suspense>
   );
 }

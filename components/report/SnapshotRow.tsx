@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, XCircle } from "lucide-react";
+import { CheckCircle2, Clock3, MinusCircle, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function SnapshotRow({
@@ -16,7 +16,7 @@ export function SnapshotRow({
   critical: number;
   high: number;
   medium: number;
-  result: "verified" | "pending" | "failed";
+  result: "verified" | "pending" | "failed" | "skipped";
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/60 py-3 last:border-b-0">
@@ -52,10 +52,12 @@ export function SnapshotRow({
           result === "verified" && "border-verify/30 bg-verify-dim text-verify",
           result === "pending" && "border-medium/30 bg-medium/15 text-medium",
           result === "failed" && "border-critical/30 bg-critical/15 text-critical",
+          result === "skipped" && "border-border bg-muted/50 text-muted-foreground",
         )}
       >
         {result === "verified" && <CheckCircle2 className="size-3.5" aria-hidden="true" />}
         {result === "failed" && <XCircle className="size-3.5" aria-hidden="true" />}
+        {result === "skipped" && <MinusCircle className="size-3.5" aria-hidden="true" />}
         {result}
       </span>
     </div>

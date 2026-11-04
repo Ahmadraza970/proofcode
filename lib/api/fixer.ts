@@ -263,7 +263,9 @@ export async function fixIssue(id: string, issue: ApiIssue): Promise<FixResult> 
     sourceLines[idx] = replacement;
     await fs.writeFile(abs, sourceLines.join("\n"), "utf8");
 
-    const stillPresent = await rescanDetector(
+    // rescanDetector resolves true when the detector NO LONGER fires on the
+    // patched line — i.e. the fix is verified clean.
+    const noLongerFlagged = await rescanDetector(
       id,
       issue.fileName,
       path.extname(issue.fileName),
@@ -285,10 +287,10 @@ export async function fixIssue(id: string, issue: ApiIssue): Promise<FixResult> 
         appliedToFile: issue.fileName,
         beforeLine: lineText,
         afterLine: replacement,
-        verified: stillPresent,
-        message: stillPresent
-          ? "Patch applied. Re-scan still flags this line — the fix may need a wider edit."
-          : "Patch applied and the line no longer trips its detector.",
+        verified: noLongerFlagged,
+        message: noLongerFlagged
+          ? "Patch applied and the line no longer trips its detector."
+          : "Patch applied. Re-scan still flags this line — the fix may need a wider edit.",
         usedLLM,
       },
       updatedIssue,

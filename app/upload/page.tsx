@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,7 +9,6 @@ import {
   FolderGit2,
   Loader2,
   LockKeyhole,
-  PlayCircle,
   TerminalSquare,
   UploadCloud,
 } from "lucide-react";
@@ -19,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { useProof } from "@/lib/store";
 import {
   ensureToken,
   createProjectFromZip,
@@ -31,7 +28,6 @@ import { cn } from "@/lib/utils";
 const SUPPORTED = ["JavaScript", "TypeScript", "Python", "React", "Node.js"];
 
 export default function UploadPage() {
-  const { startAnalysis } = useProof();
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -53,7 +49,7 @@ export default function UploadPage() {
       const file = event.dataTransfer.files?.[0];
       if (!file) return;
       if (!file.name.endsWith(".zip")) {
-        toast.error("Only .zip archives are supported in the demo.");
+        toast.error("Only .zip archives are supported.");
         return;
       }
       acceptFile(file);
@@ -65,16 +61,11 @@ export default function UploadPage() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.name.endsWith(".zip")) {
-      toast.error("Only .zip archives are supported in the demo.");
+      toast.error("Only .zip archives are supported.");
       return;
     }
     acceptFile(file);
   }, [acceptFile]);
-
-  const startDemo = useCallback(() => {
-    startAnalysis("snapcart-api");
-    router.push("/analysis");
-  }, [router, startAnalysis]);
 
   const handleStart = async () => {
     const hasFile = !!fileObj;
@@ -205,16 +196,6 @@ export default function UploadPage() {
                 aria-label="GitHub repository URL"
               />
             </div>
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setGithubUrl("https://github.com/demo/snapcart-api");
-                setFileName(null);
-              }}
-            >
-              <GithubIcon />
-              Use demo repo
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -251,18 +232,7 @@ export default function UploadPage() {
           )}
           {submitting ? "Analyzing…" : "Start Analysis"}
         </Button>
-        <Button size="lg" variant="outline" className="h-11 px-6" onClick={startDemo}>
-          <PlayCircle className="size-4" aria-hidden="true" />
-          Run the demo instead
-        </Button>
       </div>
-
-      <p className="text-center text-xs text-muted-foreground">
-        Looking for the report screens?{" "}
-        <Link href="/report/snapcart-api" className="font-medium text-brand underline underline-offset-2">
-          Open the sample report
-        </Link>
-      </p>
     </div>
   );
 }

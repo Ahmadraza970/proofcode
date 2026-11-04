@@ -131,18 +131,28 @@ export function getProjectLive(id: string): Promise<ApiProject> {
   return request<ApiProject>(`/api/v1/projects/${id}`);
 }
 
-export function createProjectFromUrl(url: string): Promise<{ ok: true; project: ApiProject }> {
+/** Lists project summaries, then fetches each full project record. */
+export async function listFullProjects(): Promise<ApiProject[]> {
+  const { projects } = await listProjects();
+  return Promise.all(projects.map((p) => getProjectLive(p.id)));
+}
+
+export async function createProjectFromUrl(url: string): Promise<{ ok: true; project: ApiProject }> {
+  const token = await ensureToken();
   return request<{ ok: true; project: ApiProject }>("/api/v1/projects", {
     method: "POST",
+    token,
     body: { url },
   });
 }
 
-export function createProjectFromZip(file: File): Promise<{ ok: true; project: ApiProject }> {
+export async function createProjectFromZip(file: File): Promise<{ ok: true; project: ApiProject }> {
+  const token = await ensureToken();
   const formData = new FormData();
   formData.append("file", file, file.name);
   return request<{ ok: true; project: ApiProject }>("/api/v1/projects", {
     method: "POST",
+    token,
     formData,
   });
 }

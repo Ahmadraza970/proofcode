@@ -2,11 +2,12 @@
 
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   CheckCircle2,
   FolderPlus,
-  PlayCircle,
+  Loader2,
+  PackageOpen,
+  RefreshCw,
   SearchCheck,
   ShieldCheck,
   Wrench,
@@ -14,6 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { ErrorState } from "@/components/shared/ErrorState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { WorkflowStrip } from "@/components/shared/WorkflowStrip";
 import { ProjectCard } from "@/components/projects/ProjectCard";
@@ -46,14 +49,8 @@ const VALUE_CARDS: {
 ];
 
 export default function DashboardPage() {
-  const { state, startAnalysis } = useProof();
-  const router = useRouter();
-  const projects = state.projects;
-
-  const runDemo = () => {
-    startAnalysis("snapcart-api");
-    router.push("/analysis");
-  };
+  const { projects, loading, error, refresh } = useProof();
+  const recent = projects.slice(0, 6);
 
   return (
     <div className="flex flex-col gap-12">
@@ -92,15 +89,6 @@ export default function DashboardPage() {
                 <FolderPlus className="size-4" aria-hidden="true" />
                 Analyze Project
               </Link>
-            </Button>
-            <Button
-              variant="outline"
-              size="lg"
-              className="h-11 px-5"
-              onClick={runDemo}
-            >
-              <PlayCircle className="size-4" aria-hidden="true" />
-              View Demo
             </Button>
           </div>
           <div className="mt-10">
@@ -149,18 +137,40 @@ export default function DashboardPage() {
           </Button>
         </PageHeader>
         <div className="mt-4">
-          {projects.length === 0 ? (
-            <Card className="p-10 text-center">
-              <p className="text-sm text-muted-foreground">
-                No projects yet.{" "}
-                <Link href="/upload" className="font-medium text-brand underline underline-offset-2">
+          {loading ? (
+            <div
+              className="flex items-center justify-center gap-3 py-10 text-muted-foreground"
+              aria-busy="true"
+            >
+              <Loader2 className="size-5 animate-spin text-brand" aria-hidden="true" />
+              <p className="text-sm">Loading your projects…</p>
+            </div>
+          ) : error ? (
+            <ErrorState
+              title="Could not load projects"
+              description={error}
+            >
+              <Button variant="outline" onClick={() => void refresh()}>
+                <RefreshCw className="size-4" aria-hidden="true" />
+                Retry
+              </Button>
+            </ErrorState>
+          ) : recent.length === 0 ? (
+            <EmptyState
+              icon={<PackageOpen className="size-6" aria-hidden="true" />}
+              title="No projects yet"
+              description="Upload a ZIP or paste a GitHub URL to get your first verification report."
+            >
+              <Button asChild>
+                <Link href="/upload">
+                  <FolderPlus className="size-4" aria-hidden="true" />
                   Analyze your first project
                 </Link>
-              </p>
-            </Card>
+              </Button>
+            </EmptyState>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {projects.map((project) => (
+              {recent.map((project) => (
                 <ProjectCard key={project.id} project={project} />
               ))}
             </div>

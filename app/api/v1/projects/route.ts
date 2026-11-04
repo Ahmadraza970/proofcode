@@ -1,28 +1,38 @@
 import { NextResponse } from "next/server";
 import { listProjects } from "@/lib/api/db";
 import { provisionProject, stageUpload } from "@/lib/api/analyze";
-import { jsonError } from "@/lib/api/auth";
+import { jsonError, requireAuth } from "@/lib/api/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
-  const projects = (await listProjects()).map((p) => ({
-    id: p.id,
-    name: p.name,
-    source: p.source,
-    language: p.language,
-    status: p.status,
-    health: p.health,
-    healthAfter: p.healthAfter,
-    fileCount: p.fileCount,
-    createdAt: p.createdAt,
-    lastAnalyzed: p.lastAnalyzed,
-    issueCount: p.issues.filter((i) => i.status === "open").length,
-  }));
-  return NextResponse.json({ projects });
+  try {
+    const projects = (await listProjects()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      source: p.source,
+      language: p.language,
+      status: p.status,
+      health: p.health,
+      healthAfter: p.healthAfter,
+      fileCount: p.fileCount,
+      createdAt: p.createdAt,
+      lastAnalyzed: p.lastAnalyzed,
+      issueCount: p.issues.filter((i) => i.status === "open").length,
+    }));
+    return NextResponse.json({ projects });
+  } catch (error) {
+    return jsonError(
+      error instanceof Error ? error.message : "Could not list projects",
+      500,
+    );
+  }
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const auth = await requireAuth(request);
+  if (auth instanceof Response) return auth;
+
   const contentType = request.headers.get("content-type") ?? "";
 
   try {

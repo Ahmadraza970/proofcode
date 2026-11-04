@@ -2,19 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { toast } from "sonner";
-import { Menu, Settings2 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetClose,
@@ -25,7 +14,6 @@ import {
 } from "@/components/ui/sheet";
 import { Logo } from "@/components/layout/Logo";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
-import { CURRENT_USER } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -77,7 +65,10 @@ export function TopNav() {
 
         <div className="ml-auto flex items-center gap-2">
           <ThemeToggle className="hidden sm:grid" />
-          <ProfileMenu />
+          <span className="hidden items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
+            <span className="size-1.5 rounded-full bg-verify" aria-hidden="true" />
+            Workspace
+          </span>
           <Sheet>
             <SheetTrigger asChild>
               <Button
@@ -125,56 +116,3 @@ export function TopNav() {
   );
 }
 
-function ProfileMenu() {
-  const [open, setOpen] = useState(false);
-  const user = CURRENT_USER;
-
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger
-        aria-label="Open account menu"
-        className="flex items-center gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <Avatar className="size-8">
-          <AvatarFallback className="bg-brand/15 text-xs font-semibold text-brand">
-            {user.initials}
-          </AvatarFallback>
-        </Avatar>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-foreground">{user.name}</span>
-            <span className="text-xs font-normal text-muted-foreground">
-              {user.email}
-            </span>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/projects">
-            <Settings2 className="size-4" aria-hidden="true" />
-            My projects
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/settings">
-            <Settings2 className="size-4" aria-hidden="true" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
-          onClick={() =>
-            toast("Sign out is not part of the demo.", {
-              description: "No auth was added for the hackathon MVP.",
-            })
-          }
-        >
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}

@@ -90,7 +90,9 @@ export async function runAnalysis(id: string): Promise<ApiProject> {
     health,
     healthAfter: health,
     scores: computeScores({ ...project, issues: summary.issues }),
-    history: [],
+    // Preserve snapshots from earlier runs — re-analysis appends to the
+    // project's history instead of wiping it.
+    history: project.history ?? [],
   };
   return (await updateProject(id, analyzed))!;
 }

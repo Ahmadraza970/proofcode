@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   },
   description:
     "Analyze, fix, test, and verify your software with an AI-powered code verification workflow.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export const viewport: Viewport = {
@@ -70,7 +75,27 @@ export default function RootLayout({
 ProofCode — Don&apos;t just trust AI-generated code. Prove it.
               </p>
               <p className="text-xs text-muted-foreground/70">
-                Hackathon MVP · demo data only · built with Next.js
+                Made by{" "}
+                <a
+                  href="https://ahmadrazaa.me"
+                  className="font-medium text-muted-foreground underline-offset-2 hover:underline"
+                >
+                  Ahmad Raza
+                </a>{" "}
+                — Ahmad Digital Studio ·{" "}
+                <a
+                  href="https://ahmadrazaa.me"
+                  className="underline-offset-2 hover:underline"
+                >
+                  ahmadrazaa.me
+                </a>{" "}
+                ·{" "}
+                <a
+                  href="/privacy"
+                  className="underline-offset-2 hover:underline"
+                >
+                  Privacy
+                </a>
               </p>
             </div>
           </footer>
