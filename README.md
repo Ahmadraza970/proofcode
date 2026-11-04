@@ -10,6 +10,10 @@ and gives the project a Security Health Score.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![React](https://img.shields.io/badge/React-19-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8) ![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E)
 
+**Live app: https://proofcodeweb.onrender.com**
+
+**Android app (APK v1.0): https://github.com/Ahmadraza970/proofcode/releases/download/v1.0/ProofCode-v1.0.apk** (GitHub Release v1.0)
+
 </div>
 
 ## The workflow
@@ -24,7 +28,7 @@ UPLOAD → ANALYZE → FIND → EXPLAIN → FIX → TEST → VERIFY
    - **Python** via heuristics: SQL injection, `eval`, `pickle`, shell execution, OS commands.
    - **Secrets**: hardcoded credential-like values (placeholder-style values such as `demo` / `*-free` dummies are ignored).
 3. **Find & explain** — each issue gets a severity, a plain-language why-it-matters, and a suggested fix.
-4. **Fix** — deterministic patches first (e.g. `innerHTML` → `textContent`); riskier findings can use an LLM rewrite (Gemini, or an OpenRouter-compatible API). Every fix is **verified by re-scanning the rewritten line** — nothing is called "fixed" unless the detector stops firing.
+4. **Fix** — deterministic patches first (e.g. `innerHTML` → `textContent`); riskier findings can use an LLM rewrite (Gemini, or an OpenRouter-compatible API). Every fix is **verified by re-scanning the rewritten line** — nothing is called "fixed" unless the detector stops firing. You can optionally bring your own AI key (Settings → "Your own AI key"): it stays in your browser and is sent only with your own fix requests.
 5. **Test** — runs the project's own suite (`npm test` or `pytest`) in a scrubbed environment that never sees the server's secrets, plus a critical-findings check.
 6. **Verify** — computes the resulting Health Score and verdict.
 
@@ -32,8 +36,12 @@ Health Score = `100 − Σ (open severity weights)`, floored at 5. Weights: crit
 
 ## Security posture
 
-- Token-authenticated API (reads and writes); in production the owner token is set on the
-  server via `PROOFCODE_OWNER_TOKEN` and is never served to anonymous callers.
+- **Google sign-in only** (Supabase Auth). There is no API token and no unauthenticated
+  route into projects: every API request carries the caller's sign-in session, which is
+  validated against the Auth server on each call. Every project belongs to the signed-in
+  user who created it — users can only see and act on their own projects. (The workspace
+  owner's Google account, set server-side via `OWNER_EMAIL`, can also see projects created
+  before sign-in existed.)
 - Rate limits on the expensive endpoints (analyze, fix, verify, project creation).
 - Uploaded code is analysed in a scratch workspace; test runs get an allow-listed
   environment only (no server secrets), and extraction is size/entry capped.
@@ -54,15 +62,17 @@ Environment (all server-side; never expose the service-role key to the browser):
 | Variable | Purpose |
 |---|---|
 | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Persistence (projects, issues, history). Without them, an in-memory fallback is used and data is not persisted. |
-| `PROOFCODE_OWNER_TOKEN` | **Set this in production.** Becomes the API token; the app then refuses anonymous token issuance and requires the token on every API call. |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Google sign-in (Supabase Auth) for the same Supabase project. Required on any real deployment — sign-in is the only way into the API. |
+| `OWNER_EMAIL` | The workspace owner's Google account; it can also see projects created before sign-in existed. Everyone else sees only their own projects. |
 | `GEMINI_API_KEY` (optional) | Enables LLM-assisted fixes (Gemini). Without a key, fixes that need an LLM are honestly refused; deterministic fixes still work. |
 | `OPENAI_API_KEY`, `OPENAI_BASE_URL` (optional) | Fallback LLM provider (OpenRouter-compatible). |
 
 ## API (`/api/v1/*`)
 
-Every endpoint requires the workspace token (`Authorization: Bearer <token>` or
-`x-api-key`). In local development (no `PROOFCODE_OWNER_TOKEN` set), fetch it from
-`GET /api/v1/keys`; in production it is the server-configured owner token.
+Every endpoint requires a valid Google sign-in session: send the Supabase Auth access
+token as `Authorization: Bearer <token>`. There are no unauthenticated project routes —
+requests without a valid session get `401`, and each user can only access their own
+projects.
 
 | Method & path | Purpose |
 |---|---|
@@ -74,7 +84,6 @@ Every endpoint requires the workspace token (`Authorization: Bearer <token>` or
 | `POST /api/v1/issues/[issueId]/fix` | Fix one issue (deterministic → LLM) |
 | `POST /api/v1/fix-all` | Attempt every open fixable issue |
 | `POST /api/v1/verify` | Run tests + critical-findings check, produce a snapshot |
-| `GET /api/v1/keys` | Dev mode: fetch the workspace token. Production: authenticated callers only |
 
 ## Verification
 
@@ -85,7 +94,7 @@ node scripts/e2e-api.mjs   # full API E2E (server must be running)
 
 ## Project layout
 
-- `lib/api/` — engine: `db` (Supabase persistence + token/health), `workspace` (clone/unzip/list), `scanner` (AST + heuristics), `fixer` (deterministic + LLM), `verify` (tests + snapshot), `analyze`, `auth`, `rate-limit`.
+- `lib/api/` — engine: `db` (Supabase persistence, health scores, per-user project ownership), `workspace` (clone/unzip/list), `scanner` (AST + heuristics), `fixer` (deterministic + LLM), `verify` (tests + snapshot), `analyze`, `auth` (Google sign-in session checks), `rate-limit`.
 - `app/api/v1/` — Next.js route handlers for the API.
 - `app/` + `components/` — the UI (pages, shared components, live-mode components), all driven by the real API — there is no demo data.
 - `scripts/e2e-api.mjs` — end-to-end API test. `scripts/fixtures/vuln-node` — a deliberately vulnerable sample app used by the tests.
@@ -93,10 +102,10 @@ node scripts/e2e-api.mjs   # full API E2E (server must be running)
 ## Privacy
 
 Projects you submit are analysed in a server-side scratch workspace; analysis results
-(issues, scores, history) are stored in the project's own Supabase database. Your code is
-sent to an AI provider **only** when you request an AI-generated fix for a specific issue.
-Deleting a project deletes its stored data. The deployed site carries the full policy at
-`/privacy`.
+(issues, scores, history) are stored in Supabase, tied to the Google account you signed in
+with. Your code is sent to an AI provider **only** when you request an AI-generated fix
+for a specific issue. Deleting a project deletes its stored data. The deployed site
+carries the full policy at `/privacy`.
 
 ## Status & honest limits
 
@@ -105,9 +114,11 @@ Deleting a project deletes its stored data. The deployed site carries the full p
   acceptance test on [MarkBot](https://github.com/Ahmadraza970/markbot) whose single
   finding was hand-checked as a false positive (a placeholder string, not a secret) —
   the detector was refined accordingly.
-- Single-user workspace by design for now (one owner token); multi-user accounts are
-  planned on top of Supabase Auth.
-- Public deployment is in progress; this README will link it here when it is live.
+- Sign-in is Google-only (Supabase Auth); every project belongs to the account that
+  created it, and the workspace owner account also manages projects created before
+  sign-in existed.
+- Live on Render (link at the top) since 2026-11-04, with an Android app (TWA wrapper of
+  the live site) published as GitHub Release v1.0.
 
 ## Tech
 
