@@ -18,10 +18,10 @@ import { SnapshotRow } from "@/components/report/SnapshotRow";
 import { ProjectsLockedState } from "@/components/projects/ProjectsLockedState";
 import {
   ApiError,
-  getStoredToken,
   listFullProjects,
   type ApiProject,
 } from "@/lib/api/client";
+import { getSessionAccessToken } from "@/lib/supabase-browser";
 
 function formatDay(iso: string): string {
   const d = new Date(iso);
@@ -48,9 +48,13 @@ export default function ReportsPage() {
     try {
       setProjects(await listFullProjects());
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401 && !getStoredToken()) {
-        // Locked deployment, no token in this browser yet: show the
-        // locked/empty state, not an "unauthorized" error.
+      const sessionToken =
+        err instanceof ApiError && err.status === 401
+          ? await getSessionAccessToken()
+          : null;
+      if (err instanceof ApiError && err.status === 401 && !sessionToken) {
+        // Not signed in: show the sign-in/empty state, not an
+        // "unauthorized" error.
         setProjects([]);
         setError(null);
         setLocked(true);

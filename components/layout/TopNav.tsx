@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/sheet";
 import { Logo } from "@/components/layout/Logo";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { AuthStatus } from "@/components/layout/AuthStatus";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -64,6 +65,7 @@ export function TopNav() {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <AuthStatus />
           <ThemeToggle className="hidden sm:grid" />
           <span className="hidden items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground sm:inline-flex">
             <span className="size-1.5 rounded-full bg-verify" aria-hidden="true" />

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findProject, updateProject, computeHealth } from "@/lib/api/db";
-import { requireAuth, jsonError } from "@/lib/api/auth";
+import { callerCanAccess, requireCaller, jsonError } from "@/lib/api/auth";
 import { fixIssue } from "@/lib/api/fixer";
 import { computeScores } from "@/lib/api/verify";
 import {
@@ -16,8 +16,8 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ issueId: string }> },
 ): Promise<Response> {
-  const auth = await requireAuth(request);
-  if (auth instanceof Response) return auth;
+  const caller = await requireCaller(request);
+  if (caller instanceof Response) return caller;
 
   const limit = rateLimit(`fix:${clientIp(request)}`, 10);
   if (!limit.ok) return rateLimitedResponse(limit);
@@ -28,7 +28,9 @@ export async function POST(
     if (!body.projectId) return jsonError("Provide a `projectId`.");
 
     const project = await findProject(body.projectId);
-    if (!project) return jsonError("Unknown projectId", 404);
+    if (!project || !callerCanAccess(caller, project)) {
+      return jsonError("Unknown projectId", 404);
+    }
     const issue = project.issues.find((i) => i.id === issueId);
     if (!issue) return jsonError("Unknown issueId", 404);
     if (issue.status !== "open") return jsonError(`Issue is already ${issue.status}.`);

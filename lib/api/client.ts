@@ -6,8 +6,8 @@ import type {
   ApiSnapshot,
   ApiTest,
 } from "./types";
+import { getSessionAccessToken } from "../supabase-browser";
 
-const TOKEN_KEY = "proofcode_api_token";
 const USER_KEY_STORAGE = "proofcode_user_llm_key";
 
 /**
@@ -76,20 +76,6 @@ async function request<T>(
   return data as T;
 }
 
-export function getStoredToken(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-export function storeToken(token: string): void {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
 export function getStoredUserKey(): string | null {
   if (typeof window === "undefined") return null;
   try {
@@ -109,27 +95,15 @@ export function clearUserKey(): void {
   localStorage.removeItem(USER_KEY_STORAGE);
 }
 
-export async function fetchToken(): Promise<string> {
-  const data = await request<{ token: string }>("/api/v1/keys");
-  storeToken(data.token);
-  return data.token;
-}
-
 /**
- * Resolves the token API calls should carry: the stored token if there is
- * one, otherwise a fresh one from `/api/v1/keys` (open dev deployments issue
- * it freely). On a deployment whose token is server-configured, `/keys`
- * answers 401 — that returns null here, so calls go out without a token,
- * fail with 401, and the UI can prompt for the token instead of looping.
+ * Resolves the credential API calls should carry: the current Google
+ * sign-in session's access token, or null when signed out. ProofCode has
+ * no API token any more (removed 2026-11-04) — sign-in is the only way
+ * in, and signed-out calls go out without a credential, fail with 401,
+ * and the UI shows the sign-in state instead of looping.
  */
 export async function ensureToken(): Promise<string | null> {
-  const existing = getStoredToken();
-  if (existing) return existing;
-  try {
-    return await fetchToken();
-  } catch {
-    return null;
-  }
+  return getSessionAccessToken();
 }
 
 export type ProjectListItem = {

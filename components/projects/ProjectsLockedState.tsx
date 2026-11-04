@@ -1,23 +1,22 @@
 import Link from "next/link";
-import { KeyRound } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 /**
- * Shown in place of an error when this deployment is locked with the owner
- * token and the current browser has not saved it yet. From the visitor's
- * side the workspace is simply empty — the way in is Settings, not a Retry
- * button on a red error box.
+ * Shown in place of an error when the visitor is not signed in. From
+ * their side the workspace is simply private and empty — the one way in
+ * is Google sign-in, not a Retry button on a red error box.
  */
 export function ProjectsLockedState() {
   return (
     <EmptyState
-      icon={<KeyRound className="size-6" aria-hidden="true" />}
+      icon={<LogIn className="size-6" aria-hidden="true" />}
       title="No projects yet"
-      description="This workspace is private. Add the owner token once in Settings and your projects will appear here."
+      description="This workspace is private. Sign in with Google to see your projects and run your first check."
     >
       <Button asChild>
-        <Link href="/settings">Open Settings</Link>
+        <Link href="/login">Sign in with Google</Link>
       </Button>
     </EmptyState>
   );

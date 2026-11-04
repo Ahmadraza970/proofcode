@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { findProject, updateProject, computeHealth } from "@/lib/api/db";
-import { requireAuth, jsonError } from "@/lib/api/auth";
+import { callerCanAccess, requireCaller, jsonError } from "@/lib/api/auth";
 import { fixIssue } from "@/lib/api/fixer";
 import { computeScores } from "@/lib/api/verify";
 import {
@@ -13,8 +13,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireAuth(request);
-  if (auth instanceof Response) return auth;
+  const caller = await requireCaller(request);
+  if (caller instanceof Response) return caller;
 
   const limit = rateLimit(`fix-all:${clientIp(request)}`, 10);
   if (!limit.ok) return rateLimitedResponse(limit);
@@ -24,7 +24,9 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.projectId) return jsonError("Provide a `projectId`.");
 
     const project = await findProject(body.projectId);
-    if (!project) return jsonError("Unknown projectId", 404);
+    if (!project || !callerCanAccess(caller, project)) {
+      return jsonError("Unknown projectId", 404);
+    }
 
     const open = project.issues.filter((i) => i.status === "open");
     if (open.length === 0) return jsonError("There are no open issues to fix on this project.");

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { runAnalysis } from "@/lib/api/analyze";
 import { findProject } from "@/lib/api/db";
-import { requireAuth, jsonError } from "@/lib/api/auth";
+import { callerCanAccess, requireCaller, jsonError } from "@/lib/api/auth";
 import {
   clientIp,
   rateLimit,
@@ -12,8 +12,8 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(request: Request): Promise<Response> {
-  const auth = await requireAuth(request);
-  if (auth instanceof Response) return auth;
+  const caller = await requireCaller(request);
+  if (caller instanceof Response) return caller;
 
   const limit = rateLimit(`analyze:${clientIp(request)}`, 5);
   if (!limit.ok) return rateLimitedResponse(limit);
@@ -22,7 +22,9 @@ export async function POST(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => ({}))) as { projectId?: string };
     if (!body.projectId) return jsonError("Provide a `projectId`.");
     const exists = await findProject(body.projectId);
-    if (!exists) return jsonError("Unknown projectId", 404);
+    if (!exists || !callerCanAccess(caller, exists)) {
+      return jsonError("Unknown projectId", 404);
+    }
 
     const project = await runAnalysis(body.projectId);
     return NextResponse.json({ ok: true, project });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { listProjects } from "@/lib/api/db";
 import { provisionProject, stageUpload } from "@/lib/api/analyze";
-import { jsonError, requireAuth } from "@/lib/api/auth";
+import { jsonError, requireCaller, scopeProjects } from "@/lib/api/auth";
 import {
   clientIp,
   rateLimit,
@@ -11,11 +11,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request): Promise<Response> {
-  const auth = await requireAuth(request);
-  if (auth instanceof Response) return auth;
+  const caller = await requireCaller(request);
+  if (caller instanceof Response) return caller;
 
   try {
-    const projects = (await listProjects()).map((p) => ({
+    const projects = scopeProjects(caller, await listProjects()).map((p) => ({
       id: p.id,
       name: p.name,
       source: p.source,
@@ -43,10 +43,13 @@ export async function POST(request: Request): Promise<Response> {
   const limit = rateLimit(`projects:${clientIp(request)}`, 5);
   if (!limit.ok) return rateLimitedResponse(limit);
 
-  const auth = await requireAuth(request);
-  if (auth instanceof Response) return auth;
+  const caller = await requireCaller(request);
+  if (caller instanceof Response) return caller;
 
   const contentType = request.headers.get("content-type") ?? "";
+  // Signed-in users stamp their projects; the owner token leaves them
+  // unstamped (owner-only), exactly as before per-user scoping existed.
+  const userId = caller.kind === "user" ? caller.userId : null;
 
   try {
     if (contentType.includes("application/json")) {
@@ -54,7 +57,7 @@ export async function POST(request: Request): Promise<Response> {
       const url = body.url?.trim();
       if (!url) return jsonError("Provide a `url` (https git repo) to analyze.");
       if (!/^https:\/\//i.test(url)) return jsonError("Only public https git URLs are supported.");
-      const project = await provisionProject({ kind: "url", url });
+      const project = await provisionProject({ kind: "url", url }, userId);
       return NextResponse.json({ ok: true, project }, { status: 201 });
     }
 
@@ -64,7 +67,7 @@ export async function POST(request: Request): Promise<Response> {
       if (!(file instanceof File)) return jsonError("Upload a .zip archive in the `file` field.");
       if (!file.name.toLowerCase().endsWith(".zip")) return jsonError("The uploaded file must be a .zip archive.");
       if (file.size > 40 * 1024 * 1024) return jsonError("Archive is larger than the 40 MB limit.");
-      const project = await provisionProject({ kind: "upload", file: new ArrayBuffer(0) });
+      const project = await provisionProject({ kind: "upload", file: new ArrayBuffer(0) }, userId);
       const buffer = Buffer.from(await file.arrayBuffer());
       await stageUpload(project.id, buffer);
       return NextResponse.json({ ok: true, project }, { status: 201 });

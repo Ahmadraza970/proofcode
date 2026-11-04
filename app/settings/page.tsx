@@ -1,44 +1,63 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import {
-  Copy,
-  Eye,
-  EyeOff,
-  KeyRound,
-  Loader2,
-  Palette,
-  Sparkles,
-  UserRound,
-} from "lucide-react";
+import { LogOut, Palette, Sparkles, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import {
-  ApiError,
   clearUserKey,
-  fetchToken,
-  getStoredToken,
   getStoredUserKey,
-  storeToken,
   storeUserKey,
 } from "@/lib/api/client";
+import {
+  getSupabaseBrowser,
+  isSupabaseAuthConfigured,
+} from "@/lib/supabase-browser";
 
 export default function SettingsPage() {
-  const [token, setToken] = useState<string | null>(null);
-  const [tokenError, setTokenError] = useState<string | null>(null);
-  const [needsPaste, setNeedsPaste] = useState(false);
-  const [pasteValue, setPasteValue] = useState("");
-  const [showToken, setShowToken] = useState(false);
   const [userKeyInput, setUserKeyInput] = useState("");
   const [userKeySaved, setUserKeySaved] = useState(false);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  // When sign-in is not configured there is nothing to check — start in
+  // the checked state instead of setting it from the effect below.
+  const [accountChecked, setAccountChecked] = useState(
+    () => !isSupabaseAuthConfigured(),
+  );
 
   useEffect(() => {
     setUserKeySaved(Boolean(getStoredUserKey()));
   }, []);
+
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    let active = true;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return;
+      setAccountEmail(data.session?.user?.email ?? null);
+      setAccountChecked(true);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccountEmail(session?.user?.email ?? null);
+      setAccountChecked(true);
+    });
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  const signOut = async () => {
+    const supabase = getSupabaseBrowser();
+    await supabase?.auth.signOut();
+    setAccountEmail(null);
+    toast.success("Signed out");
+  };
 
   const saveUserKey = () => {
     const value = userKeyInput.trim();
@@ -59,64 +78,11 @@ export default function SettingsPage() {
     toast.success("Your AI key was removed from this browser");
   };
 
-  useEffect(() => {
-    // A token this browser already holds (issued earlier, or pasted by the
-    // owner) is shown as-is; only ask the server when there is none.
-    const stored = getStoredToken();
-    if (stored) {
-      setToken(stored);
-      return;
-    }
-    let cancelled = false;
-    fetchToken()
-      .then((value) => {
-        if (!cancelled) setToken(value);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) {
-          // The deployment's token is server-configured and is not issued
-          // here — the owner pastes it once instead.
-          setNeedsPaste(true);
-        } else {
-          setTokenError(
-            err instanceof Error ? err.message : "Could not load the API token",
-          );
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const savePastedToken = () => {
-    const value = pasteValue.trim();
-    if (!value) {
-      toast.error("Paste the API token first");
-      return;
-    }
-    storeToken(value);
-    setToken(value);
-    setNeedsPaste(false);
-    setPasteValue("");
-    toast.success("API token saved for this browser");
-  };
-
-  const copyToken = async () => {
-    if (!token) return;
-    try {
-      await navigator.clipboard.writeText(token);
-      toast.success("API token copied");
-    } catch {
-      toast.error("Copy failed — select the token and copy it manually");
-    }
-  };
-
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Settings"
-        description="Preferences and API access for your ProofCode workspace."
+        description="Preferences and your account for your ProofCode workspace."
       />
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -146,103 +112,44 @@ export default function SettingsPage() {
               <UserRound className="size-4" aria-hidden="true" />
               Accounts
             </h2>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              Sign-in accounts are coming later. For now, ProofCode runs in a
-              local workspace: your projects are stored on the server and
-              identified by the API token below, not by a personal account.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* API access */}
-        <Card className="lg:col-span-2">
-          <CardContent className="p-5">
-            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
-              <KeyRound className="size-4" aria-hidden="true" />
-              API access
-            </h2>
-            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-              This token authorises API calls — reading, creating, analyzing,
-              fixing, verifying and deleting projects. Keep it private and do
-              not share it or commit it to a repository.
-            </p>
-            {needsPaste ? (
+            {!accountChecked ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Checking your sign-in…
+              </p>
+            ) : accountEmail ? (
               <>
                 <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
-                  This deployment&rsquo;s token is set on the server. Paste it
-                  here once to connect this browser.
+                  You are signed in as{" "}
+                  <span className="font-medium text-foreground">
+                    {accountEmail}
+                  </span>
+                  . Your projects belong to your account and are visible only
+                  to you. The workspace owner&rsquo;s account can see every
+                  project.
                 </p>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    value={pasteValue}
-                    onChange={(event) => setPasteValue(event.target.value)}
-                    placeholder="Paste the server-configured API token"
-                    aria-label="API token"
-                    className="font-mono text-xs"
-                  />
-                  <Button type="button" onClick={savePastedToken}>
-                    Save token
+                <div className="mt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void signOut()}
+                  >
+                    <LogOut className="size-4" aria-hidden="true" />
+                    Sign out
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    readOnly
-                    value={
-                      tokenError
-                        ? ""
-                        : token === null
-                          ? ""
-                          : showToken
-                            ? token
-                            : "•".repeat(Math.min(token.length, 32))
-                    }
-                    placeholder={
-                      tokenError ?? (token === null ? "Loading token…" : "")
-                    }
-                    aria-label="API token"
-                    className="font-mono text-xs"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowToken((value) => !value)}
-                      disabled={!token}
-                    >
-                      {showToken ? (
-                        <EyeOff className="size-4" aria-hidden="true" />
-                      ) : (
-                        <Eye className="size-4" aria-hidden="true" />
-                      )}
-                      {showToken ? "Hide" : "Show"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void copyToken()}
-                      disabled={!token}
-                    >
-                      {token === null && !tokenError ? (
-                        <Loader2
-                          className="size-4 animate-spin"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <Copy className="size-4" aria-hidden="true" />
-                      )}
-                      Copy
-                    </Button>
-                  </div>
+                <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+                  ProofCode uses Google sign-in. Your projects belong to your
+                  account and are visible only to you.
+                </p>
+                <div className="mt-4">
+                  <Button asChild>
+                    <Link href="/login">Sign in with Google</Link>
+                  </Button>
                 </div>
               </>
-            )}
-            {tokenError && (
-              <p className="mt-2 text-sm text-critical" role="alert">
-                Could not load the API token: {tokenError}
-              </p>
             )}
           </CardContent>
         </Card>

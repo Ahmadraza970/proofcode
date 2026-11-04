@@ -2,12 +2,18 @@ import { promises as fs } from "node:fs";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import AdmZip from "adm-zip";
-import { workspaceDir } from "./db";
+import {
+  workspaceDir,
+  getProjectFiles,
+  saveProjectFiles,
+  updateProjectFile,
+} from "./db";
 
 export const MAX_FILES = 400;
 export const MAX_FILE_BYTES = 1024 * 1024; // 1 MB per file
 export const MAX_ZIP_ENTRIES = 2000;
 export const MAX_ZIP_TOTAL_BYTES = 200 * 1024 * 1024; // 200 MB extracted
+export const MAX_DURABLE_TOTAL_BYTES = 25 * 1024 * 1024; // 25 MB of text per project
 
 const IGNORED_DIRS = new Set([
   ".git",
@@ -176,6 +182,89 @@ export async function listSourceFiles(id: string): Promise<ObservedFile[]> {
 
   await walk(root, "");
   return results;
+}
+
+/**
+ * Snapshots the workspace's text source files into the durable store
+ * (Supabase `proofcode_files`, or the in-memory mirror in dev). Called right
+ * after a project is provisioned from its ZIP / clone, while the extracted
+ * files are known-good on disk. Text only: the same extension/size gates as
+ * the scanner apply, and a NUL byte marks a file as binary-in-disguise.
+ * Best-effort — a missing durable table never fails an analysis.
+ */
+export async function captureProjectFiles(id: string): Promise<void> {
+  try {
+    const observed = await listSourceFiles(id);
+    const files: Record<string, string> = {};
+    let total = 0;
+    for (const file of observed) {
+      if (file.skipped) continue;
+      let content: string;
+      try {
+        content = await fs.readFile(file.filePath, "utf8");
+      } catch {
+        continue;
+      }
+      if (content.includes("\0")) continue;
+      const bytes = Buffer.byteLength(content, "utf8");
+      if (total + bytes > MAX_DURABLE_TOTAL_BYTES) continue;
+      total += bytes;
+      files[file.relPath] = content;
+    }
+    await saveProjectFiles(id, files);
+  } catch {
+    /* durability is best-effort; the disk copy remains the working cache */
+  }
+}
+
+/** Joins a stored relative path onto the workspace root, or null if it escapes. */
+function safeWorkspaceJoin(root: string, relPath: string): string | null {
+  const abs = path.resolve(root, relPath);
+  return abs.startsWith(path.resolve(root) + path.sep) ? abs : null;
+}
+
+/**
+ * Makes sure the project's source files are on disk, restoring them from
+ * the durable copy when the workspace was wiped (host restart / redeploy).
+ * Returns true when the workspace holds source files afterwards. Stages
+ * that read project files call this first instead of failing with ENOENT.
+ */
+export async function ensureWorkspaceFiles(id: string): Promise<boolean> {
+  try {
+    const existing = await listSourceFiles(id);
+    if (existing.some((f) => !f.skipped)) return true;
+  } catch {
+    /* fall through to the durable copy */
+  }
+  const files = await getProjectFiles(id);
+  if (!files) return false;
+  const dir = workspaceDir(id);
+  let wrote = false;
+  for (const [relPath, content] of Object.entries(files)) {
+    const abs = safeWorkspaceJoin(dir, relPath);
+    if (!abs) continue;
+    try {
+      await fs.mkdir(path.dirname(abs), { recursive: true });
+      await fs.writeFile(abs, content, "utf8");
+      wrote = true;
+    } catch {
+      /* one bad path must not sink the restore */
+    }
+  }
+  return wrote;
+}
+
+/** Mirrors one on-disk file (just patched by a fix) into the durable copy. */
+export async function persistProjectFile(
+  id: string,
+  relPath: string,
+  content: string,
+): Promise<void> {
+  try {
+    await updateProjectFile(id, relPath, content);
+  } catch {
+    /* best-effort; the patched file is already live on disk */
+  }
 }
 
 export function languageOf(extensions: string[]): string {

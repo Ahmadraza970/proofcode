@@ -2,7 +2,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { workspaceDir, createProject, updateProject, computeHealth } from "./db";
 import { scanWorkspace } from "./scanner";
-import { cloneRepo, unzipUpload } from "./workspace";
+import {
+  cloneRepo,
+  unzipUpload,
+  captureProjectFiles,
+  ensureWorkspaceFiles,
+} from "./workspace";
 import { computeScores } from "./verify";
 import type { ApiProject } from "./types";
 
@@ -16,13 +21,21 @@ function deriveName(source: SourceSpec): string {
   return "uploaded-project";
 }
 
-/** Creates the project record (status: pending) before source is on disk. */
-export async function provisionProject(source: SourceSpec): Promise<ApiProject> {
+/**
+ * Creates the project record (status: pending) before source is on disk.
+ * `userId` stamps the creating Supabase Auth user (per-user scoping); the
+ * owner-token path passes null, as before.
+ */
+export async function provisionProject(
+  source: SourceSpec,
+  userId: string | null = null,
+): Promise<ApiProject> {
   const name = deriveName(source);
   const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24);
   const id = slug ? `${slug}-${Date.now().toString(36)}` : Date.now().toString(36);
   const project: ApiProject = {
     id,
+    userId,
     name,
     source: source.kind,
     url: source.kind === "url" ? source.url : undefined,
@@ -58,18 +71,33 @@ export async function runAnalysis(id: string): Promise<ApiProject> {
   const project = await updateProject(id, { status: "analyzing" });
   if (!project) throw new Error(`Unknown project ${id}`);
 
+  let haveSource = false;
   try {
     if (project.source === "url" && project.url) {
       await cloneRepo(id, project.url);
+      haveSource = true;
     } else if (project.source === "upload") {
       const dir = workspaceDir(id);
       const zipPath = path.join(dir, "payload.zip");
       const buffer = await fs.readFile(zipPath);
       await unzipUpload(id, buffer);
+      haveSource = true;
     }
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Failed to fetch source";
-    return (await updateProject(id, { status: "error", error: msg }))!;
+    // The workspace is ephemeral: a restart wipes it (payload.zip included),
+    // and re-analysis of an upload can no longer re-read the archive. Fall
+    // back to the durable file copy before declaring the project broken.
+    haveSource = await ensureWorkspaceFiles(id);
+    if (!haveSource) {
+      const msg = error instanceof Error ? error.message : "Failed to fetch source";
+      return (await updateProject(id, { status: "error", error: msg }))!;
+    }
+  }
+
+  if (haveSource) {
+    // Refresh the durable copy from the files now on disk, so a later
+    // restart can rehydrate fix / verify from exactly what was scanned.
+    await captureProjectFiles(id);
   }
 
   let summary;

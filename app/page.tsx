@@ -50,14 +50,14 @@ const VALUE_CARDS: {
 ];
 
 export default function DashboardPage() {
-  const { projects, loading, error, needsToken, refresh } = useProof();
+  const { projects, loading, error, needsSignIn, refresh } = useProof();
   const recent = projects.slice(0, 6);
 
-  // Same locked-workspace retry as the Projects page: if the token was
-  // saved in Settings after the first load, pick the projects up on return.
+  // Same signed-out retry as the Projects page: if the visitor signed in
+  // after the first load, pick their projects up when they return.
   useEffect(() => {
-    if (needsToken) void refresh();
-  }, [needsToken, refresh]);
+    if (needsSignIn) void refresh();
+  }, [needsSignIn, refresh]);
 
   return (
     <div className="flex flex-col gap-12">
@@ -152,7 +152,7 @@ export default function DashboardPage() {
               <Loader2 className="size-5 animate-spin text-brand" aria-hidden="true" />
               <p className="text-sm">Loading your projects…</p>
             </div>
-          ) : needsToken ? (
+          ) : needsSignIn ? (
             <ProjectsLockedState />
           ) : error ? (
             <ErrorState

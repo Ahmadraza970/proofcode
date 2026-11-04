@@ -1,6 +1,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { workspaceDir } from "./db";
+import { ensureWorkspaceFiles, persistProjectFile } from "./workspace";
 import { scanJsTs, scanPython, scanSecrets } from "./scanner";
 import type { ApiIssue } from "./types";
 
@@ -218,6 +219,9 @@ export async function fixIssue(id: string, issue: ApiIssue, userKey?: string | n
   try {
     const abs = path.join(workspaceDir(id), issue.fileName);
     assertInsideWorkspace(id, abs);
+    // The workspace may have been wiped by a restart since analysis ran —
+    // restore the durable copy instead of failing with ENOENT.
+    await ensureWorkspaceFiles(id);
     const source = await fs.readFile(abs, "utf8");
     const sourceLines = source.split("\n");
     const idx = issue.line - 1;
@@ -270,7 +274,11 @@ export async function fixIssue(id: string, issue: ApiIssue, userKey?: string | n
     }
 
     sourceLines[idx] = replacement;
-    await fs.writeFile(abs, sourceLines.join("\n"), "utf8");
+    const patched = sourceLines.join("\n");
+    await fs.writeFile(abs, patched, "utf8");
+    // Keep the durable copy in step with the disk, so a verify/rescan after
+    // a restart sees the patched content, not the pre-fix original.
+    await persistProjectFile(id, issue.fileName, patched);
 
     // rescanDetector resolves true when the detector NO LONGER fires on the
     // patched line — i.e. the fix is verified clean.

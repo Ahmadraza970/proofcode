@@ -5,6 +5,7 @@ import {
   Database,
   FileSearch,
   Trash2,
+  UserRound,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -66,9 +67,20 @@ export default function PrivacyPage() {
             Analysis results are stored in a Supabase database: the project
             name and source, file counts, the issues found (file, line,
             severity, explanation), quality scores, health scores, test
-            results, and verification history snapshots. The workspace copy of
-            your code exists only so analysis, fixes, and verification can run
-            against it.
+            results, and verification history snapshots. Your project&rsquo;s
+            source files (text files only) are also stored with the project,
+            so analysis, fixes, and verification keep working reliably over
+            time — and they are deleted when you delete the project.
+          </p>
+        </Section>
+
+        <Section icon={UserRound} title="Sign-in">
+          <p>
+            ProofCode uses Google sign-in, handled by Supabase Auth. When you
+            sign in, Google shares your name and email address with us; the
+            email identifies your account, and your projects are visible only
+            to you. The workspace owner&rsquo;s account can see every project.
+            We never see or store your Google password.
           </p>
         </Section>
 
@@ -92,8 +104,9 @@ export default function PrivacyPage() {
         <Section icon={Trash2} title="Deletion">
           <p>
             Deleting a project deletes its stored data — the project record,
-            its issues, scores, and history — and removes its workspace copy
-            from the server. There is no separate archive copy kept behind.
+            its issues, scores, and history — together with its stored file
+            copies and its workspace copy from the server. There is no
+            separate archive copy kept behind.
           </p>
         </Section>
 
@@ -101,8 +114,9 @@ export default function PrivacyPage() {
           <p>
             ProofCode sets no advertising, analytics, or tracking cookies, and
             your data is never sold. The site uses only functional browser
-            storage: your theme preference and the workspace API token kept in
-            your browser so the interface can call the API on your behalf —
+            storage: your theme preference and your Google sign-in session
+            kept in your browser so the interface can call the API on your
+            behalf —
             plus, only if you choose to add one, your own AI key, which also
             never leaves your browser except with your fix requests.
           </p>

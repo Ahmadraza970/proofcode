@@ -17,13 +17,13 @@ import { ProjectsLockedState } from "@/components/projects/ProjectsLockedState";
 import { useProof } from "@/lib/store";
 
 export default function ProjectsPage() {
-  const { projects, loading, error, needsToken, refresh } = useProof();
+  const { projects, loading, error, needsSignIn, refresh } = useProof();
 
-  // If the workspace was locked on first load, retry once the visitor is
-  // back on this page — they may have saved the token in Settings meanwhile.
+  // If the visitor was signed out on first load, retry once they are back
+  // on this page — they may have signed in meanwhile.
   useEffect(() => {
-    if (needsToken) void refresh();
-  }, [needsToken, refresh]);
+    if (needsSignIn) void refresh();
+  }, [needsSignIn, refresh]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -58,7 +58,7 @@ export default function ProjectsPage() {
         </ErrorState>
       )}
 
-      {!loading && needsToken && <ProjectsLockedState />}
+      {!loading && needsSignIn && <ProjectsLockedState />}
 
       {!loading && !error && projects.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -72,7 +72,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {!loading && !error && !needsToken && projects.length === 0 && (
+      {!loading && !error && !needsSignIn && projects.length === 0 && (
         <EmptyState
           icon={<PackageOpen className="size-6" aria-hidden="true" />}
           title="No projects yet"

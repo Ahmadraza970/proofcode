@@ -22,14 +22,11 @@ export function ProjectCard({
 }) {
   const health = project.healthAfter ?? project.health;
   const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function handleDelete() {
     if (deleting) return;
-    const confirmed = window.confirm(
-      `Delete "${project.name}" permanently? Its files, findings and reports will be removed. This cannot be undone.`,
-    );
-    if (!confirmed) return;
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -100,30 +97,58 @@ export function ProjectCard({
         </div>
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 p-4">
-        <div className="flex gap-2">
-          <Button asChild variant="outline" className="flex-1">
-            <Link href={`/report/${project.id}`}>
-              Open Report
-              <ArrowUpRight className="size-4" aria-hidden="true" />
-            </Link>
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => void handleDelete()}
-            disabled={deleting}
-            title={`Delete ${project.name}`}
-            aria-label={`Delete ${project.name}`}
-            className="shrink-0 text-muted-foreground hover:text-critical"
-          >
-            {deleting ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
+        {confirmingDelete ? (
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+              Delete {project.name} permanently?
+            </span>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                "Confirm"
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <Button asChild variant="outline" className="flex-1">
+              <Link href={`/report/${project.id}`}>
+                Open Report
+                <ArrowUpRight className="size-4" aria-hidden="true" />
+              </Link>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                setDeleteError(null);
+                setConfirmingDelete(true);
+              }}
+              title={`Delete ${project.name}`}
+              aria-label={`Delete ${project.name}`}
+              className="shrink-0 text-muted-foreground hover:text-critical"
+            >
               <Trash2 className="size-4" aria-hidden="true" />
-            )}
-          </Button>
-        </div>
+            </Button>
+          </div>
+        )}
         {deleteError && (
           <p className="text-xs text-critical" role="alert">
             Delete failed: {deleteError}

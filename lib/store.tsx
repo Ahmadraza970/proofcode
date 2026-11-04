@@ -10,10 +10,13 @@ import {
 } from "react";
 import {
   ApiError,
-  getStoredToken,
   listProjects,
   type ProjectListItem,
 } from "./api/client";
+import {
+  getSessionAccessToken,
+  getSupabaseBrowser,
+} from "./supabase-browser";
 import type { ApiIssue, Severity } from "./api/types";
 
 export interface SeverityCounts {
@@ -42,11 +45,11 @@ export interface ProofContextValue {
   loading: boolean;
   error: string | null;
   /**
-   * True when the deployment is locked with the owner token and this
-   * browser has not saved it yet — pages show the friendly locked/empty
-   * state instead of an "unauthorized" error.
+   * True when this browser is not signed in, so the API answers 401.
+   * Pages show the friendly sign-in/empty state instead of an
+   * "unauthorized" error.
    */
-  needsToken: boolean;
+  needsSignIn: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -61,7 +64,7 @@ export function ProofCodeProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [needsToken, setNeedsToken] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -69,19 +72,19 @@ export function ProofCodeProvider({ children }: { children: ReactNode }) {
     try {
       const res = await listProjects();
       setProjects(res.projects);
-      setNeedsToken(false);
+      setNeedsSignIn(false);
     } catch (err) {
-      if (
-        err instanceof ApiError &&
-        err.status === 401 &&
-        !getStoredToken()
-      ) {
-        // Locked deployment + no token in this browser: from the visitor's
-        // side the workspace is just empty, not broken. Pages render the
-        // locked/empty state for this flag instead of the error box.
+      // A 401 with no sign-in session is not an error from the visitor's
+      // side — the workspace is simply private and empty until they sign
+      // in. Pages render the sign-in/empty state for this flag.
+      const sessionToken =
+        err instanceof ApiError && err.status === 401
+          ? await getSessionAccessToken()
+          : null;
+      if (err instanceof ApiError && err.status === 401 && !sessionToken) {
         setProjects([]);
         setError(null);
-        setNeedsToken(true);
+        setNeedsSignIn(true);
       } else {
         setError(
           err instanceof Error ? err.message : "Could not load projects",
@@ -96,9 +99,24 @@ export function ProofCodeProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  // Sign-in / sign-out changes whose projects this browser may see, so the
+  // list reloads whenever the Supabase session appears or disappears.
+  useEffect(() => {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
+        void refresh();
+      }
+    });
+    return () => {
+      data.subscription.unsubscribe();
+    };
+  }, [refresh]);
+
   return (
     <ProofContext.Provider
-      value={{ projects, loading, error, needsToken, refresh }}
+      value={{ projects, loading, error, needsSignIn, refresh }}
     >
       {children}
     </ProofContext.Provider>

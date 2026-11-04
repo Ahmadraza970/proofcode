@@ -2,6 +2,7 @@ import { promises as fs, existsSync } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { workspaceDir, computeHealth } from "./db";
+import { ensureWorkspaceFiles } from "./workspace";
 import type { ApiIssue, ApiProject, ApiScore, ApiSnapshot, ApiTest } from "./types";
 
 function nowIso(): string {
@@ -149,6 +150,9 @@ export interface VerifyOutcome {
 /** Re-scan the workspace, run a test suite if one exists, and record a snapshot. */
 export async function verifyProject(project: ApiProject): Promise<VerifyOutcome> {
   const before = projectHealth(project);
+  // Restore the durable file copy first — test detection reads package.json
+  // from the workspace, which a restart may have wiped.
+  await ensureWorkspaceFiles(project.id);
   const command = await detectTestCommand(workspaceDir(project.id));
 
   let tests: ApiTest[];
