@@ -218,6 +218,51 @@ export function verifyProjectLive(token: string | null, projectId: string): Prom
   });
 }
 
+/**
+ * Downloads the project's current files (with every applied fix) as one
+ * ZIP. The API authenticates via the `Authorization` header, which a plain
+ * anchor cannot send — so this fetches the archive as a blob and saves it
+ * through a temporary object URL. Throws ApiError on any failure so the
+ * caller can show the reason instead of failing silently.
+ */
+export async function downloadProjectZip(projectId: string): Promise<void> {
+  const token = await ensureToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(withBase(`/api/v1/projects/${projectId}/download`), {
+    headers,
+  });
+  if (!res.ok) {
+    let message = `Request failed with status ${res.status}`;
+    try {
+      const data = (await res.json()) as { error?: unknown; message?: unknown };
+      if (typeof data.error === "string" && data.error.length > 0) message = data.error;
+      else if (typeof data.message === "string" && data.message.length > 0) message = data.message;
+    } catch {
+      /* keep the status-based message */
+    }
+    throw new ApiError(message, res.status);
+  }
+
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match?.[1] || `proofcode-${projectId}-fixed.zip`;
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function deleteProjectLive(token: string | null, projectId: string): Promise<{ ok: true; deleted: string }> {
   return request<{ ok: true; deleted: string }>(`/api/v1/projects/${projectId}`, {
     method: "DELETE",

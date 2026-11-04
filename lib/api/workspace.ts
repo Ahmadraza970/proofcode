@@ -15,7 +15,7 @@ export const MAX_ZIP_ENTRIES = 2000;
 export const MAX_ZIP_TOTAL_BYTES = 200 * 1024 * 1024; // 200 MB extracted
 export const MAX_DURABLE_TOTAL_BYTES = 25 * 1024 * 1024; // 25 MB of text per project
 
-const IGNORED_DIRS = new Set([
+export const IGNORED_DIRS = new Set([
   ".git",
   "node_modules",
   ".next",

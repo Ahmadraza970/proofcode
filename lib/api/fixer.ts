@@ -96,12 +96,15 @@ function parseReplacement(content: string): string | null {
 class GeminiCallError extends Error {
   status?: number;
   retryable: boolean;
+  /** True when the failure is a 429 quota/rate-limit response. */
+  quota: boolean;
 
-  constructor(message: string, opts: { status?: number; retryable: boolean }) {
+  constructor(message: string, opts: { status?: number; retryable: boolean; quota?: boolean }) {
     super(message);
     this.name = "GeminiCallError";
     this.status = opts.status;
     this.retryable = opts.retryable;
+    this.quota = opts.quota ?? false;
   }
 }
 
@@ -120,17 +123,20 @@ function geminiErrorDetail(status: number, body: string): string {
   return `Gemini request failed (${status})${trimmed ? `: ${trimmed}` : ""}`;
 }
 
+const GEMINI_LITE_MODEL = "gemini-3.5-flash-lite";
+
 /**
- * Gemini models to try, in order: the configured/default flash model first,
- * then the lighter free flash-lite model as the overload fallback — and the
- * other way round when the lite model is the configured one.
+ * Gemini models to try, in order: the cheap flash-lite model FIRST — a
+ * one-line patch does not need the full model, and lite is faster, cheaper,
+ * and draws on its own free quota pool — escalating to the configured/full
+ * flash model only when lite cannot produce a usable line. If GEMINI_MODEL
+ * is set to the lite model itself, the chain is just that one model.
  */
 function geminiModelChain(): string[] {
-  const primary = process.env.GEMINI_MODEL || "gemini-flash-latest";
-  const chain = [primary, "gemini-3.5-flash-lite", "gemini-flash-latest"].filter(
+  const escalation = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  return [GEMINI_LITE_MODEL, escalation].filter(
     (model, idx, all) => all.indexOf(model) === idx,
   );
-  return chain.slice(0, 2);
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -171,12 +177,15 @@ async function geminiAttempt(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    // Only overload / rate-limit responses are worth retrying; a 400 or an
-    // auth error will fail identically every time, so those fail fast.
-    const retryable = res.status === 503 || res.status === 429;
+    // A 503 (overload) or a dropped connection is worth one retry and then
+    // the escalation model. A 429 means the key's quota is gone — retrying
+    // or switching models only burns more of it — so it is flagged as quota
+    // and fails at once. A 400 or an auth error will fail identically every
+    // time, so those fail fast.
     throw new GeminiCallError(geminiErrorDetail(res.status, body), {
       status: res.status,
-      retryable,
+      retryable: res.status === 503,
+      quota: res.status === 429,
     });
   }
   const data = (await res.json()) as {
@@ -186,19 +195,32 @@ async function geminiAttempt(
   return parseReplacement(content);
 }
 
-// The fix routes set maxDuration = 60s; keep the whole Gemini chain (retries
-// + model fallback) comfortably inside that, leaving headroom for the file
-// patch and rescan that follow a successful fix.
-const GEMINI_BUDGET_MS = 50_000;
+// The fix routes set maxDuration = 60s; with at most 4 requests (see
+// geminiCorrectLine) a 30s budget is plenty, and leaves headroom for the
+// file patch and rescan that follow a successful fix.
+const GEMINI_BUDGET_MS = 30_000;
 const GEMINI_ATTEMPT_TIMEOUT_MS = 20_000;
-const GEMINI_RETRY_BACKOFF_MS = [1_500, 4_000]; // waits before retry 1 and 2, per model
+const GEMINI_RETRY_BACKOFF_MS = 1_500; // the single wait before the one retry, per model
+
+// Terminal messages when a 429 ends the chain. The failure panel shows the
+// thrown message verbatim, and a user-supplied (BYOK) key must be blamed
+// only when the key really is the user's.
+const USER_QUOTA_MESSAGE =
+  "Your Gemini key has reached its free usage limit for now, so this fix could not run. Wait a while and try again, or use a different key in Settings.";
+const SERVER_QUOTA_MESSAGE =
+  "The AI fix service has reached its usage limit for now, so this fix could not run — please try again later.";
 
 /**
- * Calls Google Gemini to fix the risky line, resilient to free-tier overload:
- * each model gets up to 2 retries with short backoff on 503/429 (or a dropped
- * connection), then the chain falls back to the next model. When everything
- * is exhausted, the thrown message says plainly that the AI service is
- * overloaded and keeps the provider's own detail for the result panel.
+ * Calls Google Gemini to fix the risky line, cheaply and resiliently: the
+ * lite model goes first (see geminiModelChain) and each model gets ONE
+ * retry after a short backoff on 503 / transport failure, then the chain
+ * escalates to the next model — a worst case of 4 requests per fix, and
+ * typically just 1. A 429 (quota) is never retried and never escalated:
+ * every model draws on the same key's limits, so it fails at once with a
+ * message that names the quota as the cause. 400/auth errors fail fast, as
+ * before. When the transient retries are exhausted, the thrown message
+ * says plainly that the AI service is overloaded and keeps the provider's
+ * own detail for the result panel.
  */
 async function geminiCorrectLine(
   args: {
@@ -209,6 +231,7 @@ async function geminiCorrectLine(
     language: string;
   },
   apiKey: string,
+  opts: { userKey: boolean },
 ): Promise<string | null> {
   const prompt = buildPrompt(args);
   const models = geminiModelChain();
@@ -218,14 +241,13 @@ async function geminiCorrectLine(
 
   for (const model of models) {
     if (stop) break;
-    for (let attempt = 0; attempt <= GEMINI_RETRY_BACKOFF_MS.length; attempt++) {
+    for (let attempt = 0; attempt < 2; attempt++) {
       if (attempt > 0) {
-        const backoff = GEMINI_RETRY_BACKOFF_MS[attempt - 1];
-        if (Date.now() + backoff >= deadline) {
+        if (Date.now() + GEMINI_RETRY_BACKOFF_MS >= deadline) {
           stop = true;
           break;
         }
-        await sleep(backoff);
+        await sleep(GEMINI_RETRY_BACKOFF_MS);
       }
       const remaining = deadline - Date.now();
       if (remaining <= 1_000) {
@@ -247,13 +269,17 @@ async function geminiCorrectLine(
                 `Gemini request failed: ${error instanceof Error ? error.message : "unknown error"}`,
                 { retryable: true },
               );
-        lastError = callError;
+        // Quota is terminal for the whole chain, not just this model.
+        if (callError.quota) {
+          throw new Error(opts.userKey ? USER_QUOTA_MESSAGE : SERVER_QUOTA_MESSAGE);
+        }
         if (!callError.retryable) throw callError; // 400/auth/etc — fail fast, as before
+        lastError = callError;
       }
     }
   }
 
-  // Every model and retry is exhausted (or the time budget ran out).
+  // Every model and its retry are exhausted (or the time budget ran out).
   if (lastError?.retryable) {
     throw new Error(
       `The AI fix service is overloaded right now, so this fix could not run — please try again in a minute. (${lastError.message}; tried ${models.join(" and ")})`,
@@ -314,11 +340,11 @@ async function llmCorrectLine(
   // A key the user supplied for this request wins — heavy AI work runs on
   // their own quota. It is used for this call only and never stored.
   if (userKey) {
-    return geminiCorrectLine(args, userKey);
+    return geminiCorrectLine(args, userKey, { userKey: true });
   }
   // Prefer Gemini when configured, otherwise fall back to an OpenAI-compatible provider.
   if (process.env.GEMINI_API_KEY) {
-    return geminiCorrectLine(args, process.env.GEMINI_API_KEY);
+    return geminiCorrectLine(args, process.env.GEMINI_API_KEY, { userKey: false });
   }
   return openaiCorrectLine(args);
 }

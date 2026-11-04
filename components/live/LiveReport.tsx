@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   Activity,
   Bug,
+  Download,
   Loader2,
   RefreshCw,
   SearchCheck,
@@ -28,6 +29,7 @@ import {
   getProjectLive,
   ensureToken,
   ensureAndWrap,
+  downloadProjectZip,
   fixAll,
   verifyProjectLive,
   type ApiProject,
@@ -54,6 +56,8 @@ export function LiveReport({ id }: { id: string }) {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [fixingAll, setFixingAll] = useState(false);
   const [runningScan, setRunningScan] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +125,20 @@ export function LiveReport({ id }: { id: string }) {
       setRunningScan(false);
     }
   }, [id, router]);
+
+  const handleDownload = useCallback(async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadProjectZip(id);
+    } catch (err) {
+      setDownloadError(
+        err instanceof Error ? err.message : "Could not download the project",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }, [id]);
 
   const handleIssueChanged = useCallback((updated: ApiIssue, health?: number) => {
     setProject((prev) =>
@@ -273,7 +291,20 @@ export function LiveReport({ id }: { id: string }) {
                 )}
                 {fixingAll ? "Fixing all bugs…" : `Fix All Bugs (${openIssues.length})`}
               </Button>
+              <Button onClick={handleDownload} disabled={downloading} variant="outline">
+                {downloading ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Download className="size-4" aria-hidden="true" />
+                )}
+                {downloading ? "Preparing ZIP…" : "Download fixed project"}
+              </Button>
             </div>
+            {downloadError && (
+              <p role="alert" className="mt-3 text-sm text-critical">
+                Download failed: {downloadError}
+              </p>
+            )}
             <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
               <Activity className="size-4" aria-hidden="true" />
               {project.language} · {project.fileCount} files scanned ·{" "}
