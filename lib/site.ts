@@ -9,4 +9,4 @@
  * the Android app" button appears automatically — no other code changes
  * are needed.
  */
-export const APK_DOWNLOAD_URL = "https://github.com/Ahmadraza970/proofcode/releases/download/v1.0/ProofCode-v1.0.apk";
+export const APK_DOWNLOAD_URL = "https://github.com/Ahmadraza970/proofcode/releases/download/v1.0.1/ProofCode-v1.0.1.apk";

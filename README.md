@@ -14,11 +14,11 @@ and gives the project a Security Health Score.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![React](https://img.shields.io/badge/React-19-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8) ![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E)
 
-[![Website](https://img.shields.io/badge/Website-Live%20now-bd871c)](https://proofcodeweb.onrender.com) [![Android APK](https://img.shields.io/badge/Android-APK%20v1.0-3DDC84)](https://github.com/Ahmadraza970/proofcode/releases/tag/v1.0)
+[![Website](https://img.shields.io/badge/Website-Live%20now-bd871c)](https://proofcodeweb.onrender.com) [![Android APK](https://img.shields.io/badge/Android-APK%20v1.0.1-3DDC84)](https://github.com/Ahmadraza970/proofcode/releases/tag/v1.0.1)
 
 **Live app: https://proofcodeweb.onrender.com**
 
-**Android app (APK v1.0): https://github.com/Ahmadraza970/proofcode/releases/download/v1.0/ProofCode-v1.0.apk** (GitHub Release v1.0)
+**Android app (APK v1.0.1): https://github.com/Ahmadraza970/proofcode/releases/download/v1.0.1/ProofCode-v1.0.1.apk** (GitHub Release v1.0.1 — fixes the "App unavailable / Chrome is blocked" message some phones showed with v1.0)
 
 </div>
 
@@ -158,7 +158,7 @@ carries the full policy at `/privacy`.
   created it, and the workspace owner account also manages projects created before
   sign-in existed.
 - Live on Render (link at the top) since 2026-11-04, with an Android app (TWA wrapper of
-  the live site) published as GitHub Release v1.0.
+  the live site) published as GitHub Release v1.0.1.
 
 ## Tech
 
