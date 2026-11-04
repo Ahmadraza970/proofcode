@@ -2,10 +2,18 @@ import { NextResponse } from "next/server";
 import { listProjects } from "@/lib/api/db";
 import { provisionProject, stageUpload } from "@/lib/api/analyze";
 import { jsonError, requireAuth } from "@/lib/api/auth";
+import {
+  clientIp,
+  rateLimit,
+  rateLimitedResponse,
+} from "@/lib/api/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
+  const auth = await requireAuth(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const projects = (await listProjects()).map((p) => ({
       id: p.id,
@@ -30,6 +38,11 @@ export async function GET(): Promise<Response> {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  // Creation is the most expensive endpoint (clone/upload + extraction), so
+  // the limiter runs before auth and before any body parsing.
+  const limit = rateLimit(`projects:${clientIp(request)}`, 5);
+  if (!limit.ok) return rateLimitedResponse(limit);
+
   const auth = await requireAuth(request);
   if (auth instanceof Response) return auth;
 

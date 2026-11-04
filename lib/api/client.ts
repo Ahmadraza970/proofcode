@@ -91,10 +91,21 @@ export async function fetchToken(): Promise<string> {
   return data.token;
 }
 
-export async function ensureToken(): Promise<string> {
+/**
+ * Resolves the token API calls should carry: the stored token if there is
+ * one, otherwise a fresh one from `/api/v1/keys` (open dev deployments issue
+ * it freely). On a deployment whose token is server-configured, `/keys`
+ * answers 401 — that returns null here, so calls go out without a token,
+ * fail with 401, and the UI can prompt for the token instead of looping.
+ */
+export async function ensureToken(): Promise<string | null> {
   const existing = getStoredToken();
   if (existing) return existing;
-  return fetchToken();
+  try {
+    return await fetchToken();
+  } catch {
+    return null;
+  }
 }
 
 export type ProjectListItem = {
@@ -116,19 +127,21 @@ export async function ensureAndWrap<T>(request: () => Promise<T>): Promise<T> {
     return await request();
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
-      await fetchToken();
-      return request();
+      const token = await ensureToken();
+      if (token) return request();
     }
     throw error;
   }
 }
 
-export function listProjects(): Promise<{ projects: ProjectListItem[] }> {
-  return request<{ projects: ProjectListItem[] }>("/api/v1/projects");
+export async function listProjects(): Promise<{ projects: ProjectListItem[] }> {
+  const token = await ensureToken();
+  return request<{ projects: ProjectListItem[] }>("/api/v1/projects", { token });
 }
 
-export function getProjectLive(id: string): Promise<ApiProject> {
-  return request<ApiProject>(`/api/v1/projects/${id}`);
+export async function getProjectLive(id: string): Promise<ApiProject> {
+  const token = await ensureToken();
+  return request<ApiProject>(`/api/v1/projects/${id}`, { token });
 }
 
 /** Lists project summaries, then fetches each full project record. */
@@ -157,7 +170,7 @@ export async function createProjectFromZip(file: File): Promise<{ ok: true; proj
   });
 }
 
-export function analyzeProject(token: string, projectId: string): Promise<{ ok: true; project: ApiProject }> {
+export function analyzeProject(token: string | null, projectId: string): Promise<{ ok: true; project: ApiProject }> {
   return request<{ ok: true; project: ApiProject }>("/api/v1/analyze", {
     method: "POST",
     token,
@@ -176,7 +189,7 @@ export interface FixOutcome {
   usedLLM: boolean;
 }
 
-export function fixIssue(token: string, projectId: string, issueId: string): Promise<{ ok: boolean; outcome: FixOutcome }> {
+export function fixIssue(token: string | null, projectId: string, issueId: string): Promise<{ ok: boolean; outcome: FixOutcome }> {
   return request<{ ok: boolean; outcome: FixOutcome }>(`/api/v1/issues/${issueId}/fix`, {
     method: "POST",
     token,
@@ -184,7 +197,7 @@ export function fixIssue(token: string, projectId: string, issueId: string): Pro
   });
 }
 
-export function fixAll(token: string, projectId: string): Promise<{ ok: true; fixed: number; failed: number }> {
+export function fixAll(token: string | null, projectId: string): Promise<{ ok: true; fixed: number; failed: number }> {
   return request<{ ok: true; fixed: number; failed: number }>("/api/v1/fix-all", {
     method: "POST",
     token,
@@ -199,7 +212,7 @@ export interface VerifyOutcome {
   tests: ApiTest[];
 }
 
-export function verifyProjectLive(token: string, projectId: string): Promise<VerifyOutcome> {
+export function verifyProjectLive(token: string | null, projectId: string): Promise<VerifyOutcome> {
   return request<VerifyOutcome>("/api/v1/verify", {
     method: "POST",
     token,
@@ -207,7 +220,7 @@ export function verifyProjectLive(token: string, projectId: string): Promise<Ver
   });
 }
 
-export function deleteProjectLive(token: string, projectId: string): Promise<{ ok: true; deleted: string }> {
+export function deleteProjectLive(token: string | null, projectId: string): Promise<{ ok: true; deleted: string }> {
   return request<{ ok: true; deleted: string }>(`/api/v1/projects/${projectId}`, {
     method: "DELETE",
     token,

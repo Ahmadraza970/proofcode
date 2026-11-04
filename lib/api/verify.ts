@@ -65,13 +65,37 @@ export function makeSnapshot(project: ApiProject, label: string, result: ApiSnap
   };
 }
 
+const TEST_ENV_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+  "LANG",
+  "LC_ALL",
+] as const;
+
+/**
+ * Environment for running an uploaded project's test suite: an allowlist,
+ * never the server's own env — that holds SUPABASE_SERVICE_ROLE_KEY and the
+ * LLM API keys, and uploaded code must not see them.
+ */
+function testEnv(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { CI: "1" };
+  for (const key of TEST_ENV_ALLOWLIST) {
+    const value = process.env[key];
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
+}
+
 function runTests(dir: string, command: string[], timeout = 60_000): Promise<{ status: "passed" | "failed" | "skipped"; duration: string; output: string }> {
   return new Promise((resolve) => {
     const started = Date.now();
     const child = spawn(command[0], command.slice(1), {
       cwd: dir,
       windowsHide: true,
-      env: { ...process.env, CI: "1" },
+      env: testEnv(),
     });
     let output = "";
     const timer = setTimeout(() => {

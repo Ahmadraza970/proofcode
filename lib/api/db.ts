@@ -93,7 +93,16 @@ function projectToRow(project: ApiProject): Record<string, unknown> {
   };
 }
 
+/** True when the owner pinned the API token via `PROOFCODE_OWNER_TOKEN`. */
+export function isOwnerTokenConfigured(): boolean {
+  return Boolean(process.env.PROOFCODE_OWNER_TOKEN?.trim());
+}
+
 export async function getApiToken(): Promise<string> {
+  // A server-configured owner token wins outright: it is never generated,
+  // stored, or rotated by the app.
+  const ownerToken = process.env.PROOFCODE_OWNER_TOKEN?.trim();
+  if (ownerToken) return ownerToken;
   if (!isSupabaseConfigured()) {
     if (!mem.apiToken) {
       mem.apiToken = `pk_${crypto.randomBytes(24).toString("hex")}`;

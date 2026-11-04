@@ -6,6 +6,8 @@ import { workspaceDir } from "./db";
 
 export const MAX_FILES = 400;
 export const MAX_FILE_BYTES = 1024 * 1024; // 1 MB per file
+export const MAX_ZIP_ENTRIES = 2000;
+export const MAX_ZIP_TOTAL_BYTES = 200 * 1024 * 1024; // 200 MB extracted
 
 const IGNORED_DIRS = new Set([
   ".git",
@@ -88,12 +90,26 @@ export async function cloneRepo(id: string, url: string): Promise<void> {
 /** Unzips an uploaded archive into the project workspace, flat or nested. */
 export async function unzipUpload(id: string, buffer: Buffer): Promise<void> {
   const dir = workspaceDir(id);
+  const zip = new AdmZip(buffer);
+  const entries = zip.getEntries();
+  // Budget the *decompressed* archive before writing anything to disk: the
+  // 40 MB cap on the compressed upload alone does not stop a zip bomb.
+  if (entries.length > MAX_ZIP_ENTRIES) {
+    throw new Error(
+      `Archive has ${entries.length} entries; the limit is ${MAX_ZIP_ENTRIES}. Nothing was extracted.`,
+    );
+  }
+  const totalBytes = entries.reduce((sum, e) => sum + (e.header.size ?? 0), 0);
+  if (totalBytes > MAX_ZIP_TOTAL_BYTES) {
+    throw new Error(
+      `Archive expands past the ${MAX_ZIP_TOTAL_BYTES / (1024 * 1024)} MB extraction limit. Nothing was extracted.`,
+    );
+  }
   await fs.rm(dir, { recursive: true, force: true });
   await fs.mkdir(dir, { recursive: true });
-  const zip = new AdmZip(buffer);
-  const rootEntry = zip.getEntries()[0];
+  const rootEntry = entries[0];
   const nestedSingleRoot =
-    !!rootEntry && rootEntry.isDirectory && zip.getEntries().filter((e) => e.entryName !== rootEntry.entryName).every((e) => e.entryName.startsWith(rootEntry.entryName));
+    !!rootEntry && rootEntry.isDirectory && entries.filter((e) => e.entryName !== rootEntry.entryName).every((e) => e.entryName.startsWith(rootEntry.entryName));
   zip.extractAllTo(dir, true);
   // If the archive wrapped everything in one folder, hoist it up one level.
   if (nestedSingleRoot && rootEntry) {

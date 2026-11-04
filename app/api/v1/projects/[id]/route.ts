@@ -6,9 +6,12 @@ import { promises as fs } from "node:fs";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const auth = await requireAuth(request);
+  if (auth instanceof Response) return auth;
+
   try {
     const { id } = await context.params;
     const project = await findProject(id);

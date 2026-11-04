@@ -44,12 +44,26 @@ export function rateLimit(
   return { ok: true, retryAfterSeconds: 0 };
 }
 
-/** Best-effort client IP: first `x-forwarded-for` entry, else "local". */
+/**
+ * Best-effort client IP from headers a client cannot freely spoof: the
+ * platform's own header first (Fly's `fly-client-ip`, then `x-real-ip` as
+ * set by a trusted proxy), then the *last* `x-forwarded-for` hop — the one
+ * appended by the nearest proxy. The first XFF entry is client-supplied and
+ * is never trusted.
+ */
 export function clientIp(request: Request): string {
+  const fly = request.headers.get("fly-client-ip")?.trim();
+  if (fly) return fly;
+  const real = request.headers.get("x-real-ip")?.trim();
+  if (real) return real;
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim();
-    if (first) return first;
+    const hops = forwarded
+      .split(",")
+      .map((hop) => hop.trim())
+      .filter(Boolean);
+    const last = hops[hops.length - 1];
+    if (last) return last;
   }
   return "local";
 }
