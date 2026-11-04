@@ -54,7 +54,10 @@ export function countBySeverity(issues: ApiIssue[]): Record<ApiIssue["severity"]
 }
 
 export function makeSnapshot(project: ApiProject, label: string, result: ApiSnapshot["result"]): ApiSnapshot {
-  const counts = countBySeverity(project.issues);
+  // Snapshot counts describe what is still OPEN (the verify page labels
+  // them "issue(s) open", and the report pages count open issues too) —
+  // counting fixed findings here made the tile contradict the report.
+  const counts = countBySeverity(project.issues.filter((i) => i.status === "open"));
   return {
     date: nowIso(),
     label,

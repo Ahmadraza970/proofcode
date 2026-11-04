@@ -122,8 +122,33 @@ export function LiveReport({ id }: { id: string }) {
     }
   }, [id, router]);
 
+  const handleIssueChanged = useCallback((updated: ApiIssue) => {
+    setProject((prev) =>
+      prev
+        ? {
+            ...prev,
+            issues: prev.issues.map((i) =>
+              i.id === updated.id ? updated : i,
+            ),
+          }
+        : prev,
+    );
+  }, []);
+
   const openIssues = useMemo(
     () => (project?.issues ?? []).filter((i) => i.status === "open"),
+    [project],
+  );
+
+  const fixedIssues = useMemo(
+    () =>
+      (project?.issues ?? [])
+        .filter((i) => i.status === "fixed")
+        .sort(
+          (a, b) =>
+            severityOrder(a.severity) - severityOrder(b.severity) ||
+            a.line - b.line,
+        ),
     [project],
   );
 
@@ -319,24 +344,33 @@ export function LiveReport({ id }: { id: string }) {
                   key={issue.id}
                   issue={issue}
                   projectId={id}
-                  onChanged={(updated: ApiIssue) => {
-                    setProject((prev) =>
-                      prev
-                        ? {
-                            ...prev,
-                            issues: prev.issues.map((i) =>
-                              i.id === updated.id ? updated : i,
-                            ),
-                          }
-                        : prev,
-                    );
-                  }}
+                  onChanged={handleIssueChanged}
                 />
               ))}
             </div>
           )}
         </div>
       </section>
+
+      {/* Fixed issues stay on the page with their patches, instead of
+          vanishing from the open-only list the moment a fix succeeds. */}
+      {fixedIssues.length > 0 && (
+        <section aria-labelledby="live-fixed-heading">
+          <h2 id="live-fixed-heading" className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
+            Fixed ({fixedIssues.length})
+          </h2>
+          <div className="mt-4 flex flex-col gap-3">
+            {fixedIssues.map((issue) => (
+              <LiveIssueRow
+                key={issue.id}
+                issue={issue}
+                projectId={id}
+                onChanged={handleIssueChanged}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       <div className="flex justify-end border-t border-border pt-6">
         <Button asChild variant="outline" size="sm">

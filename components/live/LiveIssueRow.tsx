@@ -55,7 +55,7 @@ export function LiveIssueRow({
       });
       if (res.outcome.ok) {
         toast.success(res.outcome.verified ? "Fix applied and verified." : "Fix applied, but the line still flags.");
-        onChanged({ ...issue, status: "fixed", before: res.outcome.beforeLine, after: res.outcome.afterLine });
+        onChanged({ ...issue, status: "fixed", before: res.outcome.beforeLine ?? issue.before, after: res.outcome.afterLine ?? issue.after });
       } else {
         toast.error(res.outcome.message);
       }
@@ -70,7 +70,9 @@ export function LiveIssueRow({
   // The result panel is rendered in two places (exactly one at a time):
   // a FAILED fix renders it outside the collapsible details, so the failure
   // can never be missed behind a collapsed row plus a transient toast; a
-  // successful fix keeps the original behaviour (panel inside the details).
+  // successful fix renders it inside the details — and once the row lands
+  // in LiveReport's Fixed group, the stored-lines `fixedPanel` below takes
+  // over the same job outside the details.
   const resultPanel = result ? (
     <div
       className={cn(
@@ -89,13 +91,48 @@ export function LiveIssueRow({
         )}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">{result.message}</p>
+      {result.before && (
+        <div className="mt-3">
+          <CodeBlock code={result.before} header={`Before ·${issue.fileName}:${issue.line}`} />
+        </div>
+      )}
       {result.after && (
         <div className="mt-3">
-          <CodeBlock code={result.after} header={`after ·${issue.fileName}:${issue.line}`} highlightLines={[1]} />
+          <CodeBlock code={result.after} header={`Fixed ·${issue.fileName}:${issue.line}`} highlightLines={[1]} />
         </div>
       )}
     </div>
   ) : null;
+
+  // A fixed issue keeps its patch visible. Rows rendered from the store
+  // (page reload, fix-all refresh, or the remount into LiveReport's Fixed
+  // group right after a successful fix) have no `result` state, so this
+  // panel is driven by the before/after lines stored on the issue record
+  // itself — and, like the failure panel, it renders OUTSIDE the
+  // collapsible details so the patch is seen without expanding anything.
+  // Older records may not carry the lines; then no panel is shown (the
+  // row's disabled "Fixed" button remains the badge) — nothing is invented.
+  const fixedPanel =
+    issue.status === "fixed" && !result && (issue.before || issue.after) ? (
+      <div className="rounded-lg border border-verify/30 bg-verify-dim/20 p-4">
+        <p className="text-sm font-medium text-verify">
+          <span className="inline-flex items-center gap-1.5">
+            <CheckCircle2 className="size-4" aria-hidden="true" />
+            Fix applied
+          </span>
+        </p>
+        {issue.before && (
+          <div className="mt-3">
+            <CodeBlock code={issue.before} header={`Before ·${issue.fileName}:${issue.line}`} />
+          </div>
+        )}
+        {issue.after && (
+          <div className="mt-3">
+            <CodeBlock code={issue.after} header={`Fixed ·${issue.fileName}:${issue.line}`} highlightLines={[1]} />
+          </div>
+        )}
+      </div>
+    ) : null;
 
   return (
     <Card className="transition-shadow hover:shadow-md hover:shadow-black/5">
@@ -176,6 +213,8 @@ export function LiveIssueRow({
         )}
 
         {result && !result.ok && <div className="mt-4">{resultPanel}</div>}
+
+        {fixedPanel && <div className="mt-4">{fixedPanel}</div>}
       </CardContent>
     </Card>
   );

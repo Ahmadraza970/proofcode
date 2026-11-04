@@ -330,10 +330,16 @@ export function severityWeight(severity: Severity): number {
   }
 }
 
-/** Health starts at 100 and loses weight per open (incl. dismissed) issue. */
+/**
+ * Health starts at 100 and loses weight per open (incl. dismissed) issue.
+ * Fixed issues no longer count: every caller passes the project's full
+ * issue list, and this filter is the single place that decides it — a
+ * caller that forgets to pre-filter must not resurrect fixed findings
+ * into the score (verify.ts's snapshot did exactly that).
+ */
 export function computeHealth(issues: ApiIssue[]): number {
   const penalty = issues.reduce(
-    (sum, i) => sum + severityWeight(i.severity),
+    (sum, i) => sum + (i.status === "fixed" ? 0 : severityWeight(i.severity)),
     0,
   );
   return Math.max(5, 100 - penalty);

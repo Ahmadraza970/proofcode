@@ -43,7 +43,7 @@ export async function POST(request: Request): Promise<Response> {
       outcomes.push({ id: issue.id, ok: result.outcome.ok, verified: result.outcome.verified, usedLLM: result.outcome.usedLLM, message: result.outcome.message });
     }
 
-    const healthAfter = computeHealth(issues.filter((i) => i.status === "open"));
+    const healthAfter = computeHealth(issues);
     await updateProject(project.id, {
       issues,
       health: healthAfter,

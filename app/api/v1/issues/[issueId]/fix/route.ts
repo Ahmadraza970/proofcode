@@ -40,7 +40,7 @@ export async function POST(
 
     if (result.outcome.ok && result.updatedIssue) {
       const issues = project.issues.map((i) => (i.id === issueId ? result.updatedIssue! : i));
-      const healthAfter = computeHealth(issues.filter((i) => i.status === "open"));
+      const healthAfter = computeHealth(issues);
       await updateProject(project.id, {
         issues,
         healthAfter,
