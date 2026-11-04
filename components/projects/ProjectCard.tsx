@@ -1,15 +1,48 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, FileSearch } from "lucide-react";
+import { ArrowUpRight, FileSearch, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import type { ProjectListItem } from "@/lib/api/client";
+import {
+  deleteProjectLive,
+  ensureToken,
+  type ProjectListItem,
+} from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 /** Card for a real API project summary (GET /api/v1/projects). */
-export function ProjectCard({ project }: { project: ProjectListItem }) {
+export function ProjectCard({
+  project,
+  onDeleted,
+}: {
+  project: ProjectListItem;
+  onDeleted?: () => void;
+}) {
   const health = project.healthAfter ?? project.health;
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDelete() {
+    if (deleting) return;
+    const confirmed = window.confirm(
+      `Delete "${project.name}" permanently? Its files, findings and reports will be removed. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const token = await ensureToken();
+      await deleteProjectLive(token, project.id);
+      onDeleted?.();
+    } catch (err) {
+      setDeleteError(
+        err instanceof Error ? err.message : "Could not delete this project.",
+      );
+      setDeleting(false);
+    }
+  }
 
   return (
     <Card className="group flex flex-col">
@@ -66,13 +99,36 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
           )}
         </div>
       </CardContent>
-      <CardFooter className="border-t border-border/70 p-4">
-        <Button asChild variant="outline" className="w-full">
-          <Link href={`/report/${project.id}`}>
-            Open Report
-            <ArrowUpRight className="size-4" aria-hidden="true" />
-          </Link>
-        </Button>
+      <CardFooter className="flex-col items-stretch gap-2 border-t border-border/70 p-4">
+        <div className="flex gap-2">
+          <Button asChild variant="outline" className="flex-1">
+            <Link href={`/report/${project.id}`}>
+              Open Report
+              <ArrowUpRight className="size-4" aria-hidden="true" />
+            </Link>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={() => void handleDelete()}
+            disabled={deleting}
+            title={`Delete ${project.name}`}
+            aria-label={`Delete ${project.name}`}
+            className="shrink-0 text-muted-foreground hover:text-critical"
+          >
+            {deleting ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <Trash2 className="size-4" aria-hidden="true" />
+            )}
+          </Button>
+        </div>
+        {deleteError && (
+          <p className="text-xs text-critical" role="alert">
+            Delete failed: {deleteError}
+          </p>
+        )}
       </CardFooter>
     </Card>
   );

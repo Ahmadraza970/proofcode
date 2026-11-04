@@ -53,7 +53,11 @@ export default function ProjectsPage() {
       {!loading && !error && projects.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+            <ProjectCard
+              key={project.id}
+              project={project}
+              onDeleted={() => void refresh()}
+            />
           ))}
         </div>
       )}
