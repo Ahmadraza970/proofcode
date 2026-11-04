@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.svg" alt="ProofCode — Don't just trust AI-generated code. Prove it." width="100%">
+</p>
+
 <div align="center">
 
 # ProofCode
@@ -10,6 +14,8 @@ and gives the project a Security Health Score.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black) ![React](https://img.shields.io/badge/React-19-61DAFB) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6) ![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8) ![Supabase](https://img.shields.io/badge/Backend-Supabase-3ECF8E)
 
+[![Website](https://img.shields.io/badge/Website-Live%20now-bd871c)](https://proofcodeweb.onrender.com) [![Android APK](https://img.shields.io/badge/Android-APK%20v1.0-3DDC84)](https://github.com/Ahmadraza970/proofcode/releases/tag/v1.0)
+
 **Live app: https://proofcodeweb.onrender.com**
 
 **Android app (APK v1.0): https://github.com/Ahmadraza970/proofcode/releases/download/v1.0/ProofCode-v1.0.apk** (GitHub Release v1.0)
@@ -18,8 +24,9 @@ and gives the project a Security Health Score.
 
 ## The workflow
 
-```
-UPLOAD → ANALYZE → FIND → EXPLAIN → FIX → TEST → VERIFY
+```mermaid
+flowchart LR
+    A["Upload<br/>ZIP or GitHub URL"] --> B["Analyze"] --> C["Find"] --> D["Explain"] --> E["Fix"] --> F["Test"] --> G["Verify<br/>&amp; Health Score"]
 ```
 
 1. **Upload** a `.zip` or paste a GitHub repo URL (`/upload`).
@@ -33,6 +40,39 @@ UPLOAD → ANALYZE → FIND → EXPLAIN → FIX → TEST → VERIFY
 6. **Verify** — computes the resulting Health Score and verdict.
 
 Health Score = `100 − Σ (open severity weights)`, floored at 5. Weights: critical 12, high 7, medium 4, low 1.
+
+| Score | Band |
+|---|---|
+| 90–100 | **Excellent** |
+| 75–89 | **Needs Attention** |
+| 60–74 | **At Risk** |
+| Below 60 | **Critical** |
+
+### The 11 checks
+
+**JavaScript / TypeScript** — parsed with a real AST (typescript-estree):
+
+| Check | Severity |
+|---|---|
+| Dynamic SQL Query | Critical |
+| Unsafe `innerHTML` & `insertAdjacentHTML` | High |
+| `eval` / `new Function` Used | High |
+| Dynamic Shell Command | High |
+| Possible Hardcoded Secret | Medium |
+| Internal Error Sent to Client | Medium |
+
+**Python** — line-based checks in the style of Bandit:
+
+| Check | Severity |
+|---|---|
+| Dynamic SQL Query | Critical |
+| `eval` / `exec` Used | High |
+| Untrusted `pickle.loads` | High |
+| Shell Execution | High |
+| `os.system` / `popen` With Variable | Medium |
+
+Scanning is deterministic and runs on ProofCode's servers — nothing is sent to an AI
+provider during a scan. Code goes to a provider only when you request an AI-generated fix.
 
 ## Security posture
 

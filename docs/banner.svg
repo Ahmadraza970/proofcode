@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="480" viewBox="0 0 1200 480" role="img" aria-label="ProofCode — Don't just trust AI-generated code. Prove it.">
+  <rect width="1200" height="480" rx="24" fill="#FFFDF7"/>
+  <rect x="10" y="10" width="1180" height="460" rx="18" fill="none" stroke="#BD871C" stroke-opacity="0.35" stroke-width="2"/>
+  <!-- shield -->
+  <g transform="translate(110,120)">
+    <path d="M90 0 L160 22 V84 C160 138 128 176 90 196 C52 176 20 138 20 84 V22 Z" fill="#BD871C"/>
+    <path d="M90 14 L146 32 V84 C146 128 120 160 90 178 C60 160 34 128 34 84 V32 Z" fill="#D29A26"/>
+    <polyline points="58,92 82,116 124,66" fill="none" stroke="#2C1B0F" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <!-- title -->
+  <text x="330" y="218" font-family="Arial, Helvetica, sans-serif" font-size="104" font-weight="bold" fill="#2C1B0F">ProofCode</text>
+  <text x="334" y="282" font-family="Arial, Helvetica, sans-serif" font-size="37" fill="#7A5A21">Don’t just trust AI-generated code. Prove it.</text>
+  <!-- pipeline -->
+  <text x="334" y="348" font-family="Arial, Helvetica, sans-serif" font-size="25" letter-spacing="3" fill="#2C1B0F">DETECT → EXPLAIN → PATCH → RE-SCAN → TEST → VERIFY</text>
+  <!-- footer line -->
+  <text x="334" y="404" font-family="Arial, Helvetica, sans-serif" font-size="23" fill="#7A5A21">AI-assisted code security · Security health score for every project</text>
+  <text x="110" y="404" font-family="Arial, Helvetica, sans-serif" font-size="23" fill="#2C1B0F">by Ahmad Raza</text>
+</svg>
