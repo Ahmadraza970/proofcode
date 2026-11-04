@@ -47,8 +47,8 @@ export async function POST(request: Request): Promise<Response> {
   if (caller instanceof Response) return caller;
 
   const contentType = request.headers.get("content-type") ?? "";
-  // Signed-in users stamp their projects; the owner leaves them
-  // unstamped (owner-only), exactly as before per-user scoping existed.
+  // Signed-in users stamp their projects; the owner's stay unstamped
+  // (and unstamped projects are owner-only).
   const userId = caller.kind === "user" ? caller.userId : null;
 
   try {

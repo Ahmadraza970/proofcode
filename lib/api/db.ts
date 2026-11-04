@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import path from "node:path";
 import os from "node:os";
 import type { ApiProject, ApiIssue, Severity } from "./types";
@@ -11,8 +10,7 @@ import { supabase, isSupabaseConfigured } from "./supabase";
  *   the nested `issues` / `tests` / `scores` / `history` arrays are stored as
  *   JSONB (the engine always reads/writes them as whole arrays).
  * - `proofcode_config` table: legacy single-row config store (it held the
- *   old bearer API token; the token was removed on 2026-11-04 in favour of
- *   Google sign-in, and nothing reads it now).
+ *   old bearer API token; nothing reads it now).
  * - `proofcode_files` table: one row per source file (pid + relative path +
  *   text content) — the durable copy of a project's workspace. The on-disk
  *   workspace is only a cache: hosts restart and redeploy, and stages that
@@ -274,10 +272,6 @@ export async function deleteProject(id: string): Promise<boolean> {
 export function workspaceDir(id: string): string {
   const root = process.env.SCRATCH_DIR ?? path.join(os.tmpdir(), "proofcode");
   return path.join(root, "workspaces", id);
-}
-
-export function newProjectId(): string {
-  return crypto.randomBytes(6).toString("hex");
 }
 
 export interface IssueInput {

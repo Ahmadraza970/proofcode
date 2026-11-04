@@ -43,7 +43,7 @@ function deterministicPatch(source: string, line: number): { target: number; aft
   return { target: idx, after };
 }
 
-/** Ask the configured LLM (OpenRouter-compatible) for a corrected line. */
+/** The fix prompt: the flagged line plus two lines of context either side. */
 function buildPrompt(args: {
   issue: ApiIssue;
   lineText: string;
@@ -211,15 +211,14 @@ const SERVER_QUOTA_MESSAGE =
   "The AI fix service has reached its usage limit for now, so this fix could not run — please try again later.";
 
 /**
- * Calls Google Gemini to fix the risky line, cheaply and resiliently: the
- * lite model goes first (see geminiModelChain) and each model gets ONE
- * retry after a short backoff on 503 / transport failure, then the chain
- * escalates to the next model — a worst case of 4 requests per fix, and
- * typically just 1. A 429 (quota) is never retried and never escalated:
- * every model draws on the same key's limits, so it fails at once with a
- * message that names the quota as the cause. 400/auth errors fail fast, as
- * before. When the transient retries are exhausted, the thrown message
- * says plainly that the AI service is overloaded and keeps the provider's
+ * Calls Gemini to fix the risky line, keeping the request count down:
+ * the lite model goes first (see geminiModelChain) and each model gets
+ * ONE retry after a short backoff on 503 / transport failure, then the
+ * chain escalates — a worst case of 4 requests per fix, typically 1.
+ * A 429 (quota) is never retried and never escalated: every model draws
+ * on the same key's limits, so it fails at once with a message that names
+ * the quota. 400/auth errors fail fast. When the retries run out, the
+ * thrown message says the service is overloaded and keeps the provider's
  * own detail for the result panel.
  */
 async function geminiCorrectLine(

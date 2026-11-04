@@ -17,7 +17,7 @@ import { useProof } from "@/lib/store";
  *
  * Renders nothing until the session state is known (no flash of the wrong
  * state), and nothing at all when Supabase Auth is not configured on this
- * deployment — the owner-token path then stands alone, as before.
+ * deployment.
  */
 export function AuthStatus() {
   const router = useRouter();

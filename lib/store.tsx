@@ -58,7 +58,7 @@ const ProofContext = createContext<ProofContextValue | null>(null);
 /**
  * Real-data store: the single source of project lists for the UI. Fetches
  * from the live API on mount; there is no seeded or demo data — when the API
- * has no projects, `projects` is simply empty and pages show empty states.
+ * has no projects, `projects` is empty and pages show empty states.
  */
 export function ProofCodeProvider({ children }: { children: ReactNode }) {
   const [projects, setProjects] = useState<ProjectListItem[]>([]);
@@ -75,7 +75,7 @@ export function ProofCodeProvider({ children }: { children: ReactNode }) {
       setNeedsSignIn(false);
     } catch (err) {
       // A 401 with no sign-in session is not an error from the visitor's
-      // side — the workspace is simply private and empty until they sign
+      // side — the workspace is private and empty until they sign
       // in. Pages render the sign-in/empty state for this flag.
       const sessionToken =
         err instanceof ApiError && err.status === 401

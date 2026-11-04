@@ -97,10 +97,9 @@ export function clearUserKey(): void {
 
 /**
  * Resolves the credential API calls should carry: the current Google
- * sign-in session's access token, or null when signed out. ProofCode has
- * no API token any more (removed 2026-11-04) — sign-in is the only way
- * in, and signed-out calls go out without a credential, fail with 401,
- * and the UI shows the sign-in state instead of looping.
+ * sign-in session's access token, or null when signed out. There is no
+ * API token — signed-out calls go out without a credential, fail with
+ * 401, and the UI shows the sign-in state instead of looping.
  */
 export async function ensureToken(): Promise<string | null> {
   return getSessionAccessToken();

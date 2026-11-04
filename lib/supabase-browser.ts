@@ -7,7 +7,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  *
  * Configured purely from the public env vars; when they are absent the
  * sign-in surface disables itself and the API rejects every call (there
- * is no other way in — the old API token was removed on 2026-11-04). The
+ * is no other way in). The
  * anon key is safe to ship to the browser — every API call is still
  * authorised server-side, where the access token is validated on each
  * request.

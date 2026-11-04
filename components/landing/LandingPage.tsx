@@ -197,7 +197,7 @@ export function LandingPage() {
           className="pointer-events-none absolute -top-32 left-1/2 h-64 w-[36rem] -translate-x-1/2 rounded-full bg-brand/10 blur-3xl"
         />
         <div className="relative grid items-start gap-10 lg:grid-cols-[1.02fr_1fr]">
-          <div>
+          <div className="min-w-0">
             <span className="inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand-dim px-3 py-1 text-xs font-medium text-brand">
               <ShieldCheck className="size-3.5" aria-hidden="true" />
               Code security for JavaScript, TypeScript &amp; Python
@@ -238,7 +238,7 @@ export function LandingPage() {
           </div>
 
           {/* Example report: a real run on ProofCode's own two-finding test file */}
-          <div className="rounded-xl border border-border bg-background/70 p-5">
+          <div className="min-w-0 rounded-xl border border-border bg-background/70 p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="font-semibold">Example report</h2>
               <span className="font-mono text-xs text-muted-foreground">
@@ -264,7 +264,7 @@ export function LandingPage() {
                 </span>
               </li>
             </ul>
-            <div className="mt-4 flex flex-col gap-3">
+            <div className="mt-4 flex min-w-0 flex-col gap-3">
               <CodeBlock
                 header="index.js:9 — before"
                 code="db.query(query, (err, rows) => {"

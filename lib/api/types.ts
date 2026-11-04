@@ -45,9 +45,9 @@ export interface ApiSnapshot {
 export interface ApiProject {
   id: string;
   /**
-   * Supabase Auth user id of the creator when the project was made by a
-   * Google-signed-in user. `null` for owner-token projects and for every
-   * project created before per-user scoping existed (owner-only either way).
+   * Supabase Auth user id of the creator. `null` when the owner created
+   * the project, and on rows from before per-user scoping existed —
+   * unstamped projects are owner-only either way.
    */
   userId: string | null;
   name: string;

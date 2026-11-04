@@ -408,7 +408,6 @@ export async function scanWorkspace(id: string): Promise<ScanSummary> {
     const candidates: IssueInput[] = [];
     if ([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"].includes(file.ext)) {
       candidates.push(...scanJsTs(source, file.relPath));
-      // TS-only additions could live here in the future.
     }
     if (file.ext === ".py") {
       candidates.push(...scanPython(source, file.relPath));

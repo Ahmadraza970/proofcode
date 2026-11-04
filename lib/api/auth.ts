@@ -15,8 +15,7 @@ function ownerEmail(): string | null {
 }
 
 /**
- * Who is calling the API. ProofCode is Google-sign-in only — there is no
- * API token any more (removed on the owner's decision, 2026-11-04):
+ * Who is calling the API. Sign-in is Google-only; there is no API token:
  * - `owner` — signed in with the Google account named by `OWNER_EMAIL`.
  *   Sees and can do everything, including projects created before sign-in
  *   existed (they carry no user stamp).

@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 
 /**
  * Shown in place of an error when the visitor is not signed in. From
- * their side the workspace is simply private and empty — the one way in
+ * their side the workspace is private and empty — the one way in
  * is Google sign-in, not a Retry button on a red error box.
  */
 export function ProjectsLockedState() {

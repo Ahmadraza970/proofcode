@@ -24,7 +24,7 @@ function deriveName(source: SourceSpec): string {
 /**
  * Creates the project record (status: pending) before source is on disk.
  * `userId` stamps the creating Supabase Auth user (per-user scoping); the
- * owner-token path passes null, as before.
+ * owner passes null and stays unstamped.
  */
 export async function provisionProject(
   source: SourceSpec,

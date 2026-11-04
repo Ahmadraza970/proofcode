@@ -70,12 +70,11 @@ export function LiveIssueRow({
     }
   }, [issue, projectId, onChanged]);
 
-  // The result panel is rendered in two places (exactly one at a time):
+  // The result panel renders in two places (exactly one at a time):
   // a FAILED fix renders it outside the collapsible details, so the failure
-  // can never be missed behind a collapsed row plus a transient toast; a
-  // successful fix renders it inside the details — and once the row lands
-  // in LiveReport's Fixed group, the stored-lines `fixedPanel` below takes
-  // over the same job outside the details.
+  // can't hide behind a collapsed row and a fading toast; a successful fix
+  // renders it inside the details — and once the row lands in LiveReport's
+  // Fixed group, the stored-lines `fixedPanel` below takes over outside.
   const resultPanel = result ? (
     <div
       className={cn(
@@ -108,13 +107,11 @@ export function LiveIssueRow({
   ) : null;
 
   // A fixed issue keeps its patch visible. Rows rendered from the store
-  // (page reload, fix-all refresh, or the remount into LiveReport's Fixed
-  // group right after a successful fix) have no `result` state, so this
-  // panel is driven by the before/after lines stored on the issue record
-  // itself — and, like the failure panel, it renders OUTSIDE the
-  // collapsible details so the patch is seen without expanding anything.
-  // Older records may not carry the lines; then no panel is shown (the
-  // row's disabled "Fixed" button remains the badge) — nothing is invented.
+  // (page reload, fix-all refresh, the remount into the Fixed group) have
+  // no `result` state, so this panel is driven by the before/after lines
+  // stored on the issue record — and, like the failure panel, it renders
+  // OUTSIDE the collapsible details. Older records may not carry the
+  // lines; then no panel is shown (the disabled "Fixed" button is the badge).
   const fixedPanel =
     issue.status === "fixed" && !result && (issue.before || issue.after) ? (
       <div className="rounded-lg border border-verify/30 bg-verify-dim/20 p-4">

@@ -21,7 +21,7 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border border-border bg-[var(--code-bg,oklch(0.16 0.018 60))]",
+        "min-w-0 overflow-hidden rounded-lg border border-border bg-[var(--code-bg,oklch(0.16 0.018 60))]",
         className,
       )}
       data-code-block

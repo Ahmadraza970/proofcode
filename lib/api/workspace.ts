@@ -266,10 +266,3 @@ export async function persistProjectFile(
     /* best-effort; the patched file is already live on disk */
   }
 }
-
-export function languageOf(extensions: string[]): string {
-  if (extensions.some((e) => [".py"].includes(e))) return "Python";
-  if (extensions.some((e) => [".js", ".jsx", ".mjs", ".cjs"].includes(e))) return "JavaScript";
-  if (extensions.some((e) => [".ts", ".tsx"].includes(e))) return "TypeScript";
-  return "Mixed";
-}
