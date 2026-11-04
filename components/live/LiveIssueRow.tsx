@@ -67,6 +67,36 @@ export function LiveIssueRow({
     }
   }, [issue, projectId, onChanged]);
 
+  // The result panel is rendered in two places (exactly one at a time):
+  // a FAILED fix renders it outside the collapsible details, so the failure
+  // can never be missed behind a collapsed row plus a transient toast; a
+  // successful fix keeps the original behaviour (panel inside the details).
+  const resultPanel = result ? (
+    <div
+      className={cn(
+        "rounded-lg border p-4",
+        result.ok ? "border-verify/30 bg-verify-dim/20" : "border-critical/30 bg-critical/10",
+      )}
+    >
+      <p className={cn("text-sm font-medium", result.ok ? "text-verify" : "text-critical")}>
+        {result.ok ? (
+          <span className="inline-flex items-center gap-1.5">
+            <CheckCircle2 className="size-4" aria-hidden="true" />
+            Fix {result.verified ? "applied and verified" : "applied"}
+          </span>
+        ) : (
+          "Could not auto-fix"
+        )}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">{result.message}</p>
+      {result.after && (
+        <div className="mt-3">
+          <CodeBlock code={result.after} header={`after ·${issue.fileName}:${issue.line}`} highlightLines={[1]} />
+        </div>
+      )}
+    </div>
+  ) : null;
+
   return (
     <Card className="transition-shadow hover:shadow-md hover:shadow-black/5">
       <CardContent className="p-5">
@@ -141,33 +171,11 @@ export function LiveIssueRow({
               <CodeBlock code={issue.before} header={`before ·${issue.fileName}:${issue.line}`} highlightLines={[1]} />
             )}
 
-            {result && (
-              <div
-                className={cn(
-                  "rounded-lg border p-4",
-                  result.ok ? "border-verify/30 bg-verify-dim/20" : "border-critical/30 bg-critical/10",
-                )}
-              >
-                <p className={cn("text-sm font-medium", result.ok ? "text-verify" : "text-critical")}>
-                  {result.ok ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <CheckCircle2 className="size-4" aria-hidden="true" />
-                      Fix {result.verified ? "applied and verified" : "applied"}
-                    </span>
-                  ) : (
-                    "Could not auto-fix"
-                  )}
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">{result.message}</p>
-                {result.after && (
-                  <div className="mt-3">
-                    <CodeBlock code={result.after} header={`after ·${issue.fileName}:${issue.line}`} highlightLines={[1]} />
-                  </div>
-                )}
-              </div>
-            )}
+            {result && result.ok && resultPanel}
           </div>
         )}
+
+        {result && !result.ok && <div className="mt-4">{resultPanel}</div>}
       </CardContent>
     </Card>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { KeyRound, Loader2, LogOut } from "lucide-react";
+import { Loader2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -71,8 +71,7 @@ export default function LoginPage() {
           {!configured ? (
             <p className="text-sm leading-relaxed text-muted-foreground">
               Google sign-in is not configured on this deployment yet, so it
-              is switched off. Projects here are accessed with the
-              deployment&rsquo;s owner token instead.
+              is switched off.
             </p>
           ) : email ? (
             <>
@@ -121,26 +120,6 @@ export default function LoginPage() {
               </p>
             </>
           )}
-
-          <div className="border-t border-border pt-4">
-            <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">
-              <KeyRound
-                className="mt-0.5 size-4 shrink-0"
-                aria-hidden="true"
-              />
-              <span>
-                Own this deployment? You can also connect this browser with
-                the owner token in{" "}
-                <Link
-                  href="/settings"
-                  className="font-medium text-foreground underline-offset-2 hover:underline"
-                >
-                  Settings
-                </Link>
-                .
-              </span>
-            </p>
-          </div>
         </CardContent>
       </Card>
     </div>
