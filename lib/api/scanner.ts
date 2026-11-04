@@ -319,6 +319,273 @@ export function scanPython(source: string, relPath: string): IssueInput[] {
   return out;
 }
 
+/* ------------------------------------------------------------------ */
+/* Language pack (2026-11-05): PHP, Java, C/C++, HTML and CSS.         */
+/* Line-pattern detectors in the same style as the Python pack.        */
+/* fixAvailable stays "none" — no automated fix is offered for these   */
+/* languages yet, rather than pretending one exists.                   */
+/* ------------------------------------------------------------------ */
+
+type PatternRule = {
+  detector: string;
+  severity: IssueInput["severity"];
+  title: string;
+  explanation: string;
+  why: string;
+  category: string;
+  fixSuggested: string;
+  re: RegExp;
+};
+
+function runPatternRules(source: string, relPath: string, rules: PatternRule[]): IssueInput[] {
+  const out: IssueInput[] = [];
+  const lines = source.split("\n");
+  for (const r of rules) {
+    for (const m of source.matchAll(r.re)) {
+      const line = indexToLine(lines, m.index ?? 0);
+      out.push({
+        detector: r.detector,
+        severity: r.severity,
+        title: r.title,
+        explanation: r.explanation,
+        whyItMatters: r.why,
+        fileName: relPath,
+        line,
+        column: (m.index ?? 0) - lineStartOffset(lines, line),
+        category: r.category,
+        fixAvailable: "none",
+        fixSuggested: r.fixSuggested,
+      });
+    }
+  }
+  return out;
+}
+
+const PHP_RULES: PatternRule[] = [
+  {
+    detector: "php-sql-injection",
+    severity: "critical",
+    title: "SQL Query Built From User Input",
+    explanation: "A SQL query receives $_GET/$_POST/$_REQUEST/$_COOKIE data or a concatenated variable directly.",
+    why: "Unescaped input inside SQL lets an attacker read, change or delete the whole database — the classic PHP breach.",
+    category: "Security",
+    fixSuggested: "Use prepared statements (PDO prepare/bindParam or mysqli prepare) so input is never part of the SQL text.",
+    re: /(?:\bmysqli_query|\bmysql_query)\s*\([^;]*\$_(?:GET|POST|REQUEST|COOKIE)|->\s*(?:query|exec)\s*\([^;]*\$_(?:GET|POST|REQUEST|COOKIE)|(?:->\s*query|\bmysqli_query|\bmysql_query|->\s*exec)\s*\([^)]*"\s*\.\s*\$|\$\w+\s*=\s*"[^"\n]*\b(?:SELECT|INSERT INTO|UPDATE|DELETE FROM)\b[^"\n]*(?:\$\{?\w|\$_(?:GET|POST|REQUEST|COOKIE))/gi,
+  },
+  {
+    detector: "php-command-execution",
+    severity: "critical",
+    title: "Shell Command From User Input",
+    explanation: "system()/shell_exec()/passthru()/popen() receives request data directly.",
+    why: "Request data inside a shell command is remote code execution on the server.",
+    category: "Security",
+    fixSuggested: "Never pass request data to shell functions; if a command is unavoidable, use escapeshellarg() on a strict allow-list.",
+    re: /(?<![\w$.>-])(?:system|shell_exec|passthru|popen|proc_open)\s*\([^;]*\$_(?:GET|POST|REQUEST|COOKIE)/g,
+  },
+  {
+    detector: "php-command-execution",
+    severity: "high",
+    title: "Shell Command Built From a Variable",
+    explanation: "A shell function is called with a variable instead of a fixed literal command.",
+    why: "Any value that flows into the variable becomes part of the command the shell runs.",
+    category: "Security",
+    fixSuggested: "Avoid shell calls; where unavoidable, build commands from a fixed allow-list and escape arguments.",
+    re: /(?<![\w$.>-])(?:system|shell_exec|passthru)\s*\(\s*\$[a-zA-Z_]/g,
+  },
+  {
+    detector: "php-eval",
+    severity: "high",
+    title: "eval / create_function Used",
+    explanation: "Dynamic code evaluation executes a string as PHP code.",
+    why: "Any string reaching eval() becomes code running with the app's full privileges.",
+    category: "Security",
+    fixSuggested: "Remove the eval; use a parser, a lookup table or explicit conditionals instead.",
+    re: /\beval\s*\(|\bcreate_function\s*\(/g,
+  },
+  {
+    detector: "php-xss",
+    severity: "high",
+    title: "User Input Printed Without Escaping",
+    explanation: "echo/print outputs $_GET/$_POST/$_REQUEST/$_COOKIE data directly.",
+    why: "Unescaped request data in the page is reflected XSS — scripts run in the visitor's browser.",
+    category: "Security",
+    fixSuggested: "Escape output with htmlspecialchars($value, ENT_QUOTES, 'UTF-8') before printing.",
+    re: /(?:\becho|\bprint)\s+\(?\s*\$_(?:GET|POST|REQUEST|COOKIE)|<\?=\s*\$_(?:GET|POST|REQUEST|COOKIE)/g,
+  },
+  {
+    detector: "php-file-inclusion",
+    severity: "high",
+    title: "File Include From User Input",
+    explanation: "include/require is given a path straight from request data.",
+    why: "Attackers turn this into local file disclosure or remote code execution by choosing the included file.",
+    category: "Security",
+    fixSuggested: "Map an allow-list of page names to fixed files; never include a raw request value.",
+    re: /\b(?:include|include_once|require|require_once)\s*\(?\s*\$_(?:GET|POST|REQUEST|COOKIE)/g,
+  },
+  {
+    detector: "php-file-inclusion",
+    severity: "medium",
+    title: "File Include From a Variable",
+    explanation: "include/require is given a variable path rather than a fixed file.",
+    why: "If the variable can be influenced by a request, the include becomes a file-disclosure or code-execution hole.",
+    category: "Security",
+    fixSuggested: "Include fixed files, or validate the variable against an allow-list of known pages.",
+    re: /\b(?:include|include_once|require|require_once)\s*\(?\s*\$[a-zA-Z_]/g,
+  },
+];
+
+const JAVA_RULES: PatternRule[] = [
+  {
+    detector: "java-sql-injection",
+    severity: "critical",
+    title: "SQL Query Built With String Concatenation",
+    explanation: "An execute/executeQuery call or SQL-looking string is assembled with + concatenation.",
+    why: "Concatenated input inside SQL is injection — the database cannot tell data from commands.",
+    category: "Security",
+    fixSuggested: "Use PreparedStatement with ? placeholders and setString/setInt for every value.",
+    re: /\b(?:executeQuery|execute|executeUpdate)\s*\([^)]*\+|"\s*(?:SELECT|INSERT INTO|UPDATE|DELETE FROM)\b[^"\n]*"\s*\+/gi,
+  },
+  {
+    detector: "java-command-execution",
+    severity: "high",
+    title: "Runtime.exec With a Built Command",
+    explanation: "Runtime.exec() receives a variable or concatenated command rather than a fixed literal.",
+    why: "A command shaped by input runs with the server process's privileges.",
+    category: "Security",
+    fixSuggested: "Pass a fixed command plus an argument array, and validate arguments against an allow-list.",
+    re: /Runtime\.getRuntime\(\)\.exec\s*\([^)]*(?:\+|[a-zA-Z_]\w*\s*\))/g,
+  },
+  {
+    detector: "java-command-execution",
+    severity: "medium",
+    title: "ProcessBuilder From a Variable",
+    explanation: "A ProcessBuilder is constructed from a variable command or argument list.",
+    why: "If the variable is influenced by input, the spawned process and its arguments can be attacker-chosen.",
+    category: "Security",
+    fixSuggested: "Build the command from fixed literals and validated arguments only.",
+    re: /new\s+ProcessBuilder\s*\(\s*[a-zA-Z_]/g,
+  },
+  {
+    detector: "java-deserialization",
+    severity: "high",
+    title: "Unsafe Deserialization",
+    explanation: "ObjectInputStream.readObject() or XMLDecoder is used — Java native deserialization of untrusted data.",
+    why: "Crafted serialized objects execute gadget chains during readObject — a well-known remote code execution route.",
+    category: "Security",
+    fixSuggested: "Do not deserialize untrusted data with Java serialization; use JSON with a strict schema instead.",
+    re: /\bObjectInputStream\b|\breadObject\s*\(|\bXMLDecoder\b/g,
+  },
+];
+
+const C_RULES: PatternRule[] = [
+  {
+    detector: "c-buffer-overflow",
+    severity: "high",
+    title: "Unbounded String Function",
+    explanation: "strcpy/strcat/gets/sprintf copies data with no length limit.",
+    why: "These functions overflow fixed buffers — the oldest and most reliably exploitable C bug class.",
+    category: "Security",
+    fixSuggested: "Use the bounded variants (strncpy/strncat/snprintf/fgets) with the destination size, and check lengths.",
+    re: /\b(?:strcpy|strcat|gets|vsprintf|sprintf)\s*\(/g,
+  },
+  {
+    detector: "c-command-execution",
+    severity: "high",
+    title: "system() With a Built Command",
+    explanation: "system() is called with a variable rather than a fixed literal command.",
+    why: "A variable command string that input can reach is shell command injection.",
+    category: "Security",
+    fixSuggested: "Avoid system(); use exec-family calls with a fixed argument array and no shell.",
+    re: /\bsystem\s*\(\s*[a-zA-Z_]/g,
+  },
+  {
+    detector: "c-command-execution",
+    severity: "medium",
+    title: "popen() With a Built Command",
+    explanation: "popen() is called with a variable command string.",
+    why: "popen() runs the string through a shell — influenced values become commands.",
+    category: "Security",
+    fixSuggested: "Replace popen() with pipe+fork+exec using fixed arguments, or validate the command strictly.",
+    re: /\bpopen\s*\(\s*[a-zA-Z_]/g,
+  },
+  {
+    detector: "c-format-string",
+    severity: "medium",
+    title: "Variable Used as Format String",
+    explanation: "printf() is given a variable as its format string.",
+    why: "Attacker-controlled format strings (%x, %n) read the stack and can write memory.",
+    category: "Security",
+    fixSuggested: 'Use a fixed format: printf("%s", value).',
+    re: /\bprintf\s*\(\s*[a-zA-Z_]\w*\s*\)/g,
+  },
+];
+
+const HTML_RULES: PatternRule[] = [
+  {
+    detector: "html-mixed-content",
+    severity: "medium",
+    title: "Resource Loaded Over Plain HTTP",
+    explanation: "A script/stylesheet/media tag loads from an http:// URL.",
+    why: "On an HTTPS page, plain-HTTP resources can be intercepted and replaced in transit — including scripts.",
+    category: "Security",
+    fixSuggested: "Load every resource over https:// (or a relative URL).",
+    re: /<(?:script|link|img|iframe|audio|video|source)\b[^>]*(?:src|href)\s*=\s*["']http:\/\//gi,
+  },
+  {
+    detector: "html-target-blank",
+    severity: "low",
+    title: "target=_blank Without rel=noopener",
+    explanation: 'A link opens a new tab without rel="noopener", leaving window.opener set.',
+    why: "The opened page can navigate the original tab (reverse tabnabbing) to a phishing copy.",
+    category: "Security",
+    fixSuggested: 'Add rel="noopener noreferrer" to links with target="_blank".',
+    re: /<a\b[^>]*target\s*=\s*["']_blank["'](?![^>]*rel\s*=\s*["'][^"']*noopener)/gi,
+  },
+  {
+    detector: "html-iframe-no-sandbox",
+    severity: "low",
+    title: "iframe Without sandbox Attribute",
+    explanation: "An iframe embeds content without a sandbox attribute.",
+    why: "Unsandboxed embedded pages can navigate the top page, open popups and run forms as if trusted.",
+    category: "Security",
+    fixSuggested: "Add a sandbox attribute with only the permissions the embed genuinely needs.",
+    re: /<iframe\b(?![^>]*\bsandbox\b)[^>]*>/gi,
+  },
+];
+
+const CSS_RULES: PatternRule[] = [
+  {
+    detector: "css-mixed-content",
+    severity: "low",
+    title: "CSS Resource Over Plain HTTP",
+    explanation: "A url() or @import in the stylesheet points at an http:// address.",
+    why: "Plain-HTTP subresources can be modified in transit; imported stylesheets fully restyle the page.",
+    category: "Security",
+    fixSuggested: "Use https:// URLs in url() and @import.",
+    re: /(?:url\(\s*["']?|@import\s+(?:url\(\s*)?["']?)http:\/\//gi,
+  },
+];
+
+export function scanPhp(source: string, relPath: string): IssueInput[] {
+  return runPatternRules(source, relPath, PHP_RULES);
+}
+
+export function scanJava(source: string, relPath: string): IssueInput[] {
+  return runPatternRules(source, relPath, JAVA_RULES);
+}
+
+export function scanC(source: string, relPath: string): IssueInput[] {
+  return runPatternRules(source, relPath, C_RULES);
+}
+
+export function scanHtml(source: string, relPath: string): IssueInput[] {
+  return runPatternRules(source, relPath, HTML_RULES);
+}
+
+export function scanCss(source: string, relPath: string): IssueInput[] {
+  return runPatternRules(source, relPath, CSS_RULES);
+}
+
 function lineStartOffset(lines: string[], line1: number): number {
   let len = 0;
   for (let i = 0; i < line1 - 1 && i < lines.length; i++) len += lines[i].length + 1;
@@ -376,9 +643,25 @@ function walk(node: Node | null | undefined, visit: (n: Node) => void): void {
   }
 }
 
-function isTsLike(ext: string): boolean {
-  return [".ts", ".tsx"].includes(ext);
-}
+const LANGUAGE_BY_EXT: Record<string, string> = {
+  ".ts": "TypeScript",
+  ".tsx": "TypeScript",
+  ".js": "JavaScript",
+  ".jsx": "JavaScript",
+  ".mjs": "JavaScript",
+  ".cjs": "JavaScript",
+  ".py": "Python",
+  ".php": "PHP",
+  ".java": "Java",
+  ".c": "C",
+  ".h": "C",
+  ".cpp": "C++",
+  ".cc": "C++",
+  ".cxx": "C++",
+  ".hpp": "C++",
+  ".html": "HTML",
+  ".css": "CSS",
+};
 
 export interface ScanSummary {
   issues: ApiIssue[];
@@ -387,7 +670,7 @@ export interface ScanSummary {
   coverage: {
     /** Files that were read and checked (at minimum by the secrets scan). */
     scannedFiles: number;
-    /** Files a code detector (JS/TS AST or Python) actually ran over. */
+    /** Files a real detector actually ran over (JS/TS, Python, PHP, Java, C/C++, HTML, CSS). */
     codeFiles: number;
     /** Every file present in the workspace. */
     totalFiles: number;
@@ -426,6 +709,26 @@ export async function scanWorkspace(id: string): Promise<ScanSummary> {
       codeFiles += 1;
       candidates.push(...scanPython(source, file.relPath));
     }
+    if (file.ext === ".php") {
+      codeFiles += 1;
+      candidates.push(...scanPhp(source, file.relPath));
+    }
+    if (file.ext === ".java") {
+      codeFiles += 1;
+      candidates.push(...scanJava(source, file.relPath));
+    }
+    if ([".c", ".h", ".cpp", ".cc", ".cxx", ".hpp"].includes(file.ext)) {
+      codeFiles += 1;
+      candidates.push(...scanC(source, file.relPath));
+    }
+    if (file.ext === ".html") {
+      codeFiles += 1;
+      candidates.push(...scanHtml(source, file.relPath));
+    }
+    if (file.ext === ".css") {
+      codeFiles += 1;
+      candidates.push(...scanCss(source, file.relPath));
+    }
     candidates.push(...scanSecrets(source, file.relPath));
 
     for (const candidate of candidates) {
@@ -438,13 +741,7 @@ export async function scanWorkspace(id: string): Promise<ScanSummary> {
 
   const sortedExts = [...extensions.entries()].sort((a, b) => b[1] - a[1]).map(([e]) => e);
   if (sortedExts.length > 0) {
-    language = isTsLike(sortedExts[0])
-      ? "TypeScript"
-      : sortedExts[0] === ".py"
-        ? "Python"
-        : sortedExts[0].startsWith(".")
-          ? "JavaScript"
-          : "Mixed";
+    language = LANGUAGE_BY_EXT[sortedExts[0]] ?? "Mixed";
   }
 
   candidatesAll.push(...issueInputs.map((i) => makeIssue(i)));

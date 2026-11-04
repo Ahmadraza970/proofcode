@@ -48,6 +48,14 @@ const SOURCE_EXTENSIONS = new Set([
   ".sh",
   ".html",
   ".css",
+  ".php",
+  ".java",
+  ".c",
+  ".h",
+  ".cpp",
+  ".cc",
+  ".cxx",
+  ".hpp",
 ]);
 
 function runProcess(cmd: string, args: string[], cwd: string, timeoutMs: number): Promise<string> {

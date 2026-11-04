@@ -135,8 +135,8 @@ export async function runAnalysis(id: string): Promise<ApiProject> {
   }
 
   const { coverage } = summary;
-  // Honest-scan rule: when no code file could be scanned at all (e.g. a PHP
-  // or Java repo — ProofCode reads JavaScript, TypeScript and Python), the
+  // Honest-scan rule: when no code file could be scanned at all (e.g. a Go
+  // or Ruby repo — none of the languages ProofCode reads), the
   // project must NOT be labelled clean with a perfect score. No score is
   // recorded, and the language names what was actually found so the report
   // can say plainly that nothing was scanned.

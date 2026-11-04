@@ -231,7 +231,7 @@ export function LiveReport({ id }: { id: string }) {
   };
   const score = project.health ?? 0;
   // An analyzed project with no health score was never actually scanned
-  // (no JavaScript, TypeScript or Python files — e.g. a PHP repo). It must
+  // (no supported code files at all — e.g. a Go or Ruby repo). It must
   // be presented as "not scanned", never as a clean 100 or a critical 0.
   const notScanned = project.health === null && project.status === "analyzed";
 
@@ -244,13 +244,13 @@ export function LiveReport({ id }: { id: string }) {
             <div>
               <p className="font-semibold">This project was not scanned</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                No JavaScript, TypeScript or Python files were found
+                No supported code files were found
                 {project.language && project.language !== "Mixed"
                   ? <> — the code is mostly {project.language}, which ProofCode cannot read yet</>
                   : null}
                 . No health score was given, because an unscanned project is
-                never labelled clean. Upload a JavaScript, TypeScript or
-                Python project to get real findings.
+                never labelled clean. ProofCode reads JavaScript, TypeScript,
+                Python, PHP, Java, C, C++, HTML and CSS.
               </p>
             </div>
           </CardContent>
@@ -401,7 +401,7 @@ export function LiveReport({ id }: { id: string }) {
               <EmptyState
                 icon={<ShieldAlert className="size-6" aria-hidden="true" />}
                 title="Nothing was scanned"
-                description="This project has no JavaScript, TypeScript or Python code, so there are no findings to show — that is not the same as passing."
+                description="This project has no code in a language ProofCode reads, so there are no findings to show — that is not the same as passing."
               />
             ) : (
               <EmptyState
