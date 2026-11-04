@@ -29,11 +29,12 @@ export async function POST(request: Request): Promise<Response> {
     const open = project.issues.filter((i) => i.status === "open");
     if (open.length === 0) return jsonError("There are no open issues to fix on this project.");
 
+    const userKey = request.headers.get("x-user-llm-key")?.trim() || null;
     const outcomes = [];
     let issues = [...project.issues];
 
     for (const issue of open) {
-      const result = await fixIssue(project.id, issue);
+      const result = await fixIssue(project.id, issue, userKey);
       if (result.outcome.ok && result.updatedIssue) {
         issues = issues.map((i) => (i.id === issue.id ? result.updatedIssue! : i));
       }

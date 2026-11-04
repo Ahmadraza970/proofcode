@@ -20,7 +20,7 @@ export function SnapshotRow({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border/60 py-3 last:border-b-0">
-      <div className="min-w-0 flex-1">
+      <div className="w-full min-w-0 sm:w-auto sm:flex-1">
         <p className="text-sm font-medium">{label}</p>
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Clock3 className="size-3" aria-hidden="true" />

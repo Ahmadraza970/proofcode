@@ -92,15 +92,16 @@ function parseReplacement(content: string): string | null {
 }
 
 /** Calls Google Gemini (flash) to fix the risky line. */
-async function geminiCorrectLine(args: {
-  issue: ApiIssue;
-  lineText: string;
-  before: string;
-  after: string;
-  language: string;
-}): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return null;
+async function geminiCorrectLine(
+  args: {
+    issue: ApiIssue;
+    lineText: string;
+    before: string;
+    after: string;
+    language: string;
+  },
+  apiKey: string,
+): Promise<string | null> {
   const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
   const prompt = buildPrompt(args);
 
@@ -173,16 +174,24 @@ async function openaiCorrectLine(args: {
   return parseReplacement(content);
 }
 
-async function llmCorrectLine(args: {
-  issue: ApiIssue;
-  lineText: string;
-  before: string;
-  after: string;
-  language: string;
-}): Promise<string | null> {
+async function llmCorrectLine(
+  args: {
+    issue: ApiIssue;
+    lineText: string;
+    before: string;
+    after: string;
+    language: string;
+  },
+  userKey?: string | null,
+): Promise<string | null> {
+  // A key the user supplied for this request wins — heavy AI work runs on
+  // their own quota. It is used for this call only and never stored.
+  if (userKey) {
+    return geminiCorrectLine(args, userKey);
+  }
   // Prefer Gemini when configured, otherwise fall back to an OpenAI-compatible provider.
   if (process.env.GEMINI_API_KEY) {
-    return geminiCorrectLine(args);
+    return geminiCorrectLine(args, process.env.GEMINI_API_KEY);
   }
   return openaiCorrectLine(args);
 }
@@ -205,7 +214,7 @@ async function rescanDetector(
 }
 
 /** Attempts a real fix for one issue: deterministic patch first, then LLM. */
-export async function fixIssue(id: string, issue: ApiIssue): Promise<FixResult> {
+export async function fixIssue(id: string, issue: ApiIssue, userKey?: string | null): Promise<FixResult> {
   try {
     const abs = path.join(workspaceDir(id), issue.fileName);
     assertInsideWorkspace(id, abs);
@@ -232,7 +241,7 @@ export async function fixIssue(id: string, issue: ApiIssue): Promise<FixResult> 
           before,
           after,
           language: issue.fileName.endsWith(".py") ? "Python" : "JavaScript/TypeScript",
-        });
+        }, userKey);
         usedLLM = true;
       } catch (error) {
         replacement = null;
@@ -311,9 +320,88 @@ export async function fixIssue(id: string, issue: ApiIssue): Promise<FixResult> 
 function issuedUnfixableMessage(issue: ApiIssue): string {
   if (issue.fixAvailable === "auto") return "No safe automatic patch was found for this exact line.";
   if (issue.fixAvailable === "llm") {
-    return "This finding needs an LLM to fix, but no GEMINI_API_KEY (or OPENAI_API_KEY) is configured. Add one in .env.local, or fix it manually.";
+    return "This finding needs an AI fix, but no AI key is available. Add your own free Gemini key in Settings, or fix it manually.";
   }
   return "This finding cannot be auto-fixed (rotate the secret manually, or adjust the code by hand).";
+}
+
+export interface GuestCodeFix {
+  fixedCode: string;
+  summary: string;
+}
+
+/**
+ * Whole-file AI repair for guest mode ("Fix my code"): corrects the pasted
+ * error and the scanner findings in one pass. Runs only on the caller's own
+ * API key — guest mode never spends the server's key.
+ */
+export async function llmFixCode(args: {
+  code: string;
+  fileName: string;
+  errorMessage?: string;
+  issues: ApiIssue[];
+  apiKey: string;
+}): Promise<GuestCodeFix> {
+  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  const findings = args.issues
+    .slice(0, 20)
+    .map((i) => `- [${i.severity}] line ${i.line}: ${i.title} — ${i.explanation}`)
+    .join("\n");
+  const prompt = [
+    "You are ProofCode's repair engine. Fix the user's code file.",
+    "Rules: correct the pasted error (if any) and every listed security finding; keep all other behaviour identical; do not add features; return the COMPLETE corrected file, not a diff.",
+    'Respond with JSON only: {"fixedCode": "<the complete corrected file>", "summary": "<one or two plain sentences on what you changed>"}',
+    "",
+    `File: ${args.fileName}`,
+    args.errorMessage
+      ? `Error the user is seeing:\n${args.errorMessage}`
+      : "Error the user is seeing: (none pasted)",
+    `Security findings from ProofCode's scanner:\n${findings || "- none"}`,
+    "",
+    "Code:",
+    args.code,
+  ].join("\n");
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-goog-api-key": args.apiKey,
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.1,
+          responseMimeType: "application/json",
+        },
+      }),
+      signal: AbortSignal.timeout(45_000),
+    },
+  );
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Gemini request failed (${res.status}): ${body.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const content = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("The AI provider returned an unreadable response. Try again.");
+  let parsed: { fixedCode?: string; summary?: string };
+  try {
+    parsed = JSON.parse(match[0]) as { fixedCode?: string; summary?: string };
+  } catch {
+    throw new Error("The AI provider returned an unreadable response. Try again.");
+  }
+  const fixedCode = parsed.fixedCode?.trim();
+  if (!fixedCode || fixedCode.length > 120_000) {
+    throw new Error("The AI provider returned an unusable fix. Try again.");
+  }
+  return { fixedCode, summary: parsed.summary?.trim() || "AI repair applied." };
 }
 
 /** Resolve the absolute path helper used by callers that need to re-read files. */

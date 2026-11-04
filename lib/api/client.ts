@@ -8,6 +8,7 @@ import type {
 } from "./types";
 
 const TOKEN_KEY = "proofcode_api_token";
+const USER_KEY_STORAGE = "proofcode_user_llm_key";
 
 /**
  * Base URL for the analysis API. When the UI is hosted separately from the
@@ -38,6 +39,10 @@ async function request<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  // The visitor's own AI key, when they saved one in Settings, rides along so
+  // heavy AI work can run on their quota. It lives only in this browser.
+  const userKey = getStoredUserKey();
+  if (userKey) headers["x-user-llm-key"] = userKey;
   if (options.body !== undefined && !options.formData) {
     headers["Content-Type"] = "application/json";
   }
@@ -83,6 +88,25 @@ export function getStoredToken(): string | null {
 export function storeToken(token: string): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(TOKEN_KEY, token);
+}
+
+export function getStoredUserKey(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(USER_KEY_STORAGE);
+  } catch {
+    return null;
+  }
+}
+
+export function storeUserKey(key: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(USER_KEY_STORAGE, key);
+}
+
+export function clearUserKey(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(USER_KEY_STORAGE);
 }
 
 export async function fetchToken(): Promise<string> {
@@ -224,6 +248,42 @@ export function deleteProjectLive(token: string | null, projectId: string): Prom
   return request<{ ok: true; deleted: string }>(`/api/v1/projects/${projectId}`, {
     method: "DELETE",
     token,
+  });
+}
+
+export interface GuestIssue {
+  detector: string;
+  severity: string;
+  title: string;
+  explanation: string;
+  line: number;
+  fileName: string;
+  fixAvailable: "auto" | "llm" | "none";
+}
+
+export interface GuestFixResult {
+  ok: true;
+  health: number;
+  issues: GuestIssue[];
+  fixedCode: string | null;
+  summary: string | null;
+  aiFix: "done" | "needs-key" | "failed";
+  aiError: string | null;
+}
+
+/**
+ * Guest mode ("Fix my code"): stateless scan + optional AI repair of one
+ * pasted file. No workspace token is needed; the visitor's own key, when
+ * saved, rides in the header via `request`.
+ */
+export function guestFix(input: {
+  code: string;
+  fileName: string;
+  errorMessage?: string;
+}): Promise<GuestFixResult> {
+  return request<GuestFixResult>("/api/v1/guest/fix", {
+    method: "POST",
+    body: input,
   });
 }
 

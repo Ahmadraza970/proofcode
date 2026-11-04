@@ -33,7 +33,8 @@ export async function POST(
     if (!issue) return jsonError("Unknown issueId", 404);
     if (issue.status !== "open") return jsonError(`Issue is already ${issue.status}.`);
 
-    const result = await fixIssue(project.id, issue);
+    const userKey = request.headers.get("x-user-llm-key")?.trim() || null;
+    const result = await fixIssue(project.id, issue, userKey);
 
     if (result.outcome.ok && result.updatedIssue) {
       const issues = project.issues.map((i) => (i.id === issueId ? result.updatedIssue! : i));

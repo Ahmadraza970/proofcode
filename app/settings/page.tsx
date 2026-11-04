@@ -9,6 +9,7 @@ import {
   KeyRound,
   Loader2,
   Palette,
+  Sparkles,
   UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,9 +19,12 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import {
   ApiError,
+  clearUserKey,
   fetchToken,
   getStoredToken,
+  getStoredUserKey,
   storeToken,
+  storeUserKey,
 } from "@/lib/api/client";
 
 export default function SettingsPage() {
@@ -29,6 +33,31 @@ export default function SettingsPage() {
   const [needsPaste, setNeedsPaste] = useState(false);
   const [pasteValue, setPasteValue] = useState("");
   const [showToken, setShowToken] = useState(false);
+  const [userKeyInput, setUserKeyInput] = useState("");
+  const [userKeySaved, setUserKeySaved] = useState(false);
+
+  useEffect(() => {
+    setUserKeySaved(Boolean(getStoredUserKey()));
+  }, []);
+
+  const saveUserKey = () => {
+    const value = userKeyInput.trim();
+    if (!value) {
+      toast.error("Paste your Gemini key first");
+      return;
+    }
+    storeUserKey(value);
+    setUserKeySaved(true);
+    setUserKeyInput("");
+    toast.success("Your AI key is saved in this browser");
+  };
+
+  const removeUserKey = () => {
+    clearUserKey();
+    setUserKeySaved(false);
+    setUserKeyInput("");
+    toast.success("Your AI key was removed from this browser");
+  };
 
   useEffect(() => {
     // A token this browser already holds (issued earlier, or pasted by the
@@ -215,6 +244,62 @@ export default function SettingsPage() {
                 Could not load the API token: {tokenError}
               </p>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Your own AI key */}
+        <Card className="lg:col-span-2">
+          <CardContent className="p-5">
+            <h2 className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-muted-foreground">
+              <Sparkles className="size-4" aria-hidden="true" />
+              Your own AI key
+            </h2>
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              Heavy AI work — AI-generated fixes — uses this key first, before
+              the server&rsquo;s key. It is stored only in this browser, sent
+              only with your fix requests, and never saved on the server.
+              Leave it empty to use the server&rsquo;s key. Get a free key
+              from{" "}
+              <a
+                href="https://aistudio.google.com"
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-foreground underline-offset-2 hover:underline"
+              >
+                Google AI Studio
+              </a>
+              .
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <Input
+                type="password"
+                value={userKeyInput}
+                onChange={(event) => setUserKeyInput(event.target.value)}
+                placeholder={
+                  userKeySaved
+                    ? "A key is saved in this browser — paste a new one to replace it"
+                    : "Paste your Gemini API key (optional)"
+                }
+                aria-label="Your Gemini API key"
+                className="font-mono text-xs"
+                autoComplete="off"
+              />
+              <div className="flex gap-2">
+                <Button type="button" onClick={saveUserKey}>
+                  Save key
+                </Button>
+                {userKeySaved && (
+                  <Button type="button" variant="outline" onClick={removeUserKey}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {userKeySaved
+                ? "Status: a key is saved in this browser and will be used for AI fixes."
+                : "Status: no key saved — AI fixes will use the server's key."}
+            </p>
           </CardContent>
         </Card>
       </div>

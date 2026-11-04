@@ -56,6 +56,11 @@ export default function PrivacyPage() {
             workspace on our server, where the analysis runs.
           </p>
           <p>
+            On the &ldquo;Fix my code&rdquo; page you can also paste a single
+            file as a guest. Guest submissions are scanned in memory only —
+            they are never written to the workspace or the database.
+          </p>
+          <p>
             Please do not upload secrets — API keys, passwords, or production
             credentials should never be part of a submission.
           </p>
@@ -70,6 +75,9 @@ export default function PrivacyPage() {
             your code exists only so analysis, fixes, and verification can run
             against it.
           </p>
+          <p>
+            Guest mode stores nothing at all: no project, no code, no results.
+          </p>
         </Section>
 
         <Section icon={BrainCircuit} title="AI providers">
@@ -80,6 +88,12 @@ export default function PrivacyPage() {
             configured, so the provider can propose the fix. The deterministic
             scanner and the built-in patches run entirely on our server and
             send nothing anywhere.
+          </p>
+          <p>
+            If you add your own Gemini key in Settings, AI fixes run on your
+            key instead of the server&rsquo;s. Your key is stored only in your
+            browser, is sent only with your fix requests so the request can be
+            made, and is never stored on our server.
           </p>
         </Section>
 
@@ -96,7 +110,9 @@ export default function PrivacyPage() {
             ProofCode sets no advertising, analytics, or tracking cookies, and
             your data is never sold. The site uses only functional browser
             storage: your theme preference and the workspace API token kept in
-            your browser so the interface can call the API on your behalf.
+            your browser so the interface can call the API on your behalf —
+            plus, only if you choose to add one, your own AI key, which also
+            never leaves your browser except with your fix requests.
           </p>
           <p>
             ProofCode is built by Ahmad Raza — Ahmad Digital Studio (
