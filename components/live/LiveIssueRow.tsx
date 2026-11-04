@@ -28,7 +28,10 @@ export function LiveIssueRow({
 }: {
   issue: ApiIssue;
   projectId: string;
-  onChanged: (updated: ApiIssue) => void;
+  // `health` is the server's recomputed project health after a successful
+  // fix (carried in the fix response), so the parent can refresh its header
+  // score immediately; absent on failure.
+  onChanged: (updated: ApiIssue, health?: number) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [fixing, setFixing] = useState(false);
@@ -55,7 +58,7 @@ export function LiveIssueRow({
       });
       if (res.outcome.ok) {
         toast.success(res.outcome.verified ? "Fix applied and verified." : "Fix applied, but the line still flags.");
-        onChanged({ ...issue, status: "fixed", before: res.outcome.beforeLine ?? issue.before, after: res.outcome.afterLine ?? issue.after });
+        onChanged({ ...issue, status: "fixed", before: res.outcome.beforeLine ?? issue.before, after: res.outcome.afterLine ?? issue.after }, res.health);
       } else {
         toast.error(res.outcome.message);
       }

@@ -38,9 +38,14 @@ export async function POST(
     const userKey = request.headers.get("x-user-llm-key")?.trim() || null;
     const result = await fixIssue(project.id, issue, userKey);
 
+    // On success the project's health is recomputed and stored; the value
+    // is also returned so the live report can refresh its header score from
+    // this response instead of waiting for a full project reload.
+    let health: number | undefined;
     if (result.outcome.ok && result.updatedIssue) {
       const issues = project.issues.map((i) => (i.id === issueId ? result.updatedIssue! : i));
       const healthAfter = computeHealth(issues);
+      health = healthAfter;
       await updateProject(project.id, {
         issues,
         healthAfter,
@@ -49,7 +54,11 @@ export async function POST(
       });
     }
 
-    return NextResponse.json({ ok: result.outcome.ok, outcome: result.outcome });
+    return NextResponse.json({
+      ok: result.outcome.ok,
+      outcome: result.outcome,
+      ...(health !== undefined ? { health } : {}),
+    });
   } catch (error) {
     return jsonError(error instanceof Error ? error.message : "Fix failed", 500);
   }

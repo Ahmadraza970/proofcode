@@ -122,7 +122,7 @@ export function LiveReport({ id }: { id: string }) {
     }
   }, [id, router]);
 
-  const handleIssueChanged = useCallback((updated: ApiIssue) => {
+  const handleIssueChanged = useCallback((updated: ApiIssue, health?: number) => {
     setProject((prev) =>
       prev
         ? {
@@ -130,6 +130,13 @@ export function LiveReport({ id }: { id: string }) {
             issues: prev.issues.map((i) =>
               i.id === updated.id ? updated : i,
             ),
+            // A successful fix carries the server's recomputed health in
+            // its response — apply it to the header score now (mirroring
+            // the stored record, which sets health = healthAfter) instead
+            // of leaving the pre-fix score up until a reload.
+            ...(typeof health === "number"
+              ? { health, healthAfter: health }
+              : {}),
           }
         : prev,
     );

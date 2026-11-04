@@ -187,8 +187,8 @@ export interface FixOutcome {
   usedLLM: boolean;
 }
 
-export function fixIssue(token: string | null, projectId: string, issueId: string): Promise<{ ok: boolean; outcome: FixOutcome }> {
-  return request<{ ok: boolean; outcome: FixOutcome }>(`/api/v1/issues/${issueId}/fix`, {
+export function fixIssue(token: string | null, projectId: string, issueId: string): Promise<{ ok: boolean; outcome: FixOutcome; health?: number }> {
+  return request<{ ok: boolean; outcome: FixOutcome; health?: number }>(`/api/v1/issues/${issueId}/fix`, {
     method: "POST",
     token,
     body: { projectId },
