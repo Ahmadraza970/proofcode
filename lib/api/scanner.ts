@@ -342,7 +342,7 @@ export function scanSecrets(source: string, relPath: string): IssueInput[] {
   const lines = source.split("\n");
   for (const m of source.matchAll(SECRET_RE)) {
     const value = m[1] ?? "";
-    if (/demo|example|sample|changeme|your[-_]|xxxx|placeholder|password\b/i.test(value) && value.length < 40) continue;
+    if (/demo|example|sample|changeme|your[-_]|xxxx|placeholder|password\b|dummy|fake|public|no[-_]?key|[-_]free\b|free[-_]/i.test(value) && value.length < 40) continue;
     const line = indexToLine(lines, m.index ?? 0);
     const excerpt = m[0].replace(/([:=]\s*["']).{6}.*/, "$1…").slice(0, 80);
     out.push({
