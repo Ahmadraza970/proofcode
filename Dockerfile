@@ -4,7 +4,15 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# .env not present in image; build doesn't need it (env injected at runtime)
+# Server-side secrets are injected at runtime, but NEXT_PUBLIC_* values are
+# baked into the browser bundle at build time, so they must be present
+# DURING the build. Render passes the service's env vars as Docker build
+# args only when the Dockerfile declares them as ARG — without these lines
+# the deployed site cannot see that Google sign-in is configured.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 RUN npm run build
 
 # ---- run stage ----
