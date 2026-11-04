@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import {
   FolderPlus,
@@ -12,10 +13,17 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ProjectsLockedState } from "@/components/projects/ProjectsLockedState";
 import { useProof } from "@/lib/store";
 
 export default function ProjectsPage() {
-  const { projects, loading, error, refresh } = useProof();
+  const { projects, loading, error, needsToken, refresh } = useProof();
+
+  // If the workspace was locked on first load, retry once the visitor is
+  // back on this page — they may have saved the token in Settings meanwhile.
+  useEffect(() => {
+    if (needsToken) void refresh();
+  }, [needsToken, refresh]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -50,6 +58,8 @@ export default function ProjectsPage() {
         </ErrorState>
       )}
 
+      {!loading && needsToken && <ProjectsLockedState />}
+
       {!loading && !error && projects.length > 0 && (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {projects.map((project) => (
@@ -62,7 +72,7 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {!loading && !error && projects.length === 0 && (
+      {!loading && !error && !needsToken && projects.length === 0 && (
         <EmptyState
           icon={<PackageOpen className="size-6" aria-hidden="true" />}
           title="No projects yet"

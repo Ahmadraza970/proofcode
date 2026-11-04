@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, type CSSProperties } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -20,6 +20,7 @@ import { ErrorState } from "@/components/shared/ErrorState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { WorkflowStrip } from "@/components/shared/WorkflowStrip";
 import { ProjectCard } from "@/components/projects/ProjectCard";
+import { ProjectsLockedState } from "@/components/projects/ProjectsLockedState";
 import { useProof } from "@/lib/store";
 
 const VALUE_CARDS: {
@@ -49,8 +50,14 @@ const VALUE_CARDS: {
 ];
 
 export default function DashboardPage() {
-  const { projects, loading, error, refresh } = useProof();
+  const { projects, loading, error, needsToken, refresh } = useProof();
   const recent = projects.slice(0, 6);
+
+  // Same locked-workspace retry as the Projects page: if the token was
+  // saved in Settings after the first load, pick the projects up on return.
+  useEffect(() => {
+    if (needsToken) void refresh();
+  }, [needsToken, refresh]);
 
   return (
     <div className="flex flex-col gap-12">
@@ -145,6 +152,8 @@ export default function DashboardPage() {
               <Loader2 className="size-5 animate-spin text-brand" aria-hidden="true" />
               <p className="text-sm">Loading your projects…</p>
             </div>
+          ) : needsToken ? (
+            <ProjectsLockedState />
           ) : error ? (
             <ErrorState
               title="Could not load projects"
@@ -171,7 +180,11 @@ export default function DashboardPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {recent.map((project) => (
-                <ProjectCard key={project.id} project={project} />
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onDeleted={() => void refresh()}
+                />
               ))}
             </div>
           )}

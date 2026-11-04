@@ -15,7 +15,13 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { SnapshotRow } from "@/components/report/SnapshotRow";
-import { listFullProjects, type ApiProject } from "@/lib/api/client";
+import { ProjectsLockedState } from "@/components/projects/ProjectsLockedState";
+import {
+  ApiError,
+  getStoredToken,
+  listFullProjects,
+  type ApiProject,
+} from "@/lib/api/client";
 
 function formatDay(iso: string): string {
   const d = new Date(iso);
@@ -33,14 +39,24 @@ export default function ReportsPage() {
   const [projects, setProjects] = useState<ApiProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const load = async () => {
     setLoading(true);
     setError(null);
+    setLocked(false);
     try {
       setProjects(await listFullProjects());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load reports");
+      if (err instanceof ApiError && err.status === 401 && !getStoredToken()) {
+        // Locked deployment, no token in this browser yet: show the
+        // locked/empty state, not an "unauthorized" error.
+        setProjects([]);
+        setError(null);
+        setLocked(true);
+      } else {
+        setError(err instanceof Error ? err.message : "Could not load reports");
+      }
     } finally {
       setLoading(false);
     }
@@ -67,6 +83,8 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {!loading && locked && <ProjectsLockedState />}
+
       {!loading && error && (
         <ErrorState title="Could not load reports" description={error}>
           <Button variant="outline" onClick={() => void load()}>
@@ -76,7 +94,7 @@ export default function ReportsPage() {
         </ErrorState>
       )}
 
-      {!loading && !error && projects.length === 0 && (
+      {!loading && !error && !locked && projects.length === 0 && (
         <EmptyState
           icon={<PackageOpen className="size-6" aria-hidden="true" />}
           title="No reports yet"
