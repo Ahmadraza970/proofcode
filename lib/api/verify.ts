@@ -81,7 +81,7 @@ const TEST_ENV_ALLOWLIST = [
  * LLM API keys, and uploaded code must not see them.
  */
 function testEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { CI: "1" };
+  const env: NodeJS.ProcessEnv = { CI: "1", NODE_ENV: process.env.NODE_ENV ?? "production" };
   for (const key of TEST_ENV_ALLOWLIST) {
     const value = process.env[key];
     if (value !== undefined) env[key] = value;
