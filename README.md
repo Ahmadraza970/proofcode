@@ -1,358 +1,79 @@
-# 🔐 ProofCode
+# ProofCode
 
-### Find Real Security Bugs. Patch Code. Prove The Fix.
+AI-powered code verification. Upload a project (ZIP or GitHub URL), ProofCode runs real static analysis, explains and fixes bugs (deterministic rules + optionally Gemini), re-scans to verify each fix, runs your test suite, and produces a project Health Score and verdict.
 
-ProofCode is an AI-powered code security platform designed to help developers identify vulnerabilities, understand security issues, generate automated patches, and verify whether those fixes actually work.
+Built with **Next.js 16 (App Router), React 19, TypeScript (strict)**, **Tailwind CSS v4**, and **shadcn/ui** (radix-nova). Also ships a fully self-contained **mock demo** that replays the whole workflow without any backend — for instant exploration of every screen.
 
-Instead of stopping at vulnerability detection or AI-generated suggestions, ProofCode creates a verification loop:
+## The workflow
 
-**Detect → Explain → Patch → Re-scan → Test → Verify**
-
----
-
-## 🚨 The Problem
-
-Modern developers increasingly use AI coding assistants and rapid **"vibe coding"** to build applications.
-
-This makes development faster — but it can also introduce security vulnerabilities that are difficult to identify manually.
-
-Traditional tools often create another problem:
-
-> Finding a vulnerability doesn't automatically mean the developer knows how to fix it correctly.
-
-And an AI-generated patch shouldn't simply be trusted.
-
-Developers need a system that can answer:
-
-**"Was the vulnerability actually fixed?"**
-
----
-
-## 💡 Our Solution
-
-ProofCode analyzes a codebase, detects security vulnerabilities, explains the findings, generates fixes, and then verifies the modified code through re-scanning and testing.
-
-### The workflow
-
-```text
-Codebase
-   ↓
-Repository Analysis
-   ↓
-Security Detection
-   ↓
-Vulnerability Explanation
-   ↓
-AI-Generated Patch
-   ↓
-Re-scan
-   ↓
-Test Execution
-   ↓
-Verified Result
+```
+UPLOAD → ANALYZE → FIND → EXPLAIN → FIX → TEST → VERIFY
 ```
 
----
+1. **Upload** a `.zip` or paste a GitHub repo URL (`/upload`).
+2. **Analyze** — clones/unzips into an isolated workspace and scans:
+   - JavaScript/TypeScript via an AST (typescript-estree): SQL injection, XSS (`innerHTML`), `eval`/`new Function`, command injection (`exec`/`spawn`), sensitive-error exposure.
+   - Python via heuristics: `eval`, `pickle`, shell execution, SQL injection, OS command.
+   - Secrets: hardcoded credential keys.
+3. **Find & explain** — each issue gets a severity, a why-it-matters explanation, and a suggested fix.
+4. **Fix** — deterministic patches first (e.g. `innerHTML` → `textContent`); risky findings fall back to an LLM (Gemini) to rewrite the line. Every fix is **verified by re-scanning the rewritten file** — no write is claimed "fixed" unless the detector no longer fires on that line.
+5. **Test** — runs the project's own test suite (`npm test` or `pytest`) plus a security re-scan.
+6. **Verify** — computes the resulting Health Score and verdict.
 
-## ✨ Key Features
+Health Score = `100 − Σ (open severity weights)`, floored at 5. Weights: critical 12, high 7, medium 4, low 1.
 
-### 🔍 Vulnerability Detection
-
-Analyze a project and identify potentially dangerous code patterns and security vulnerabilities.
-
-### 🤖 AI-Assisted Patching
-
-Generate automated patches for detected security issues.
-
-### 🔄 Re-scan After Fix
-
-The patched code is analyzed again instead of assuming the generated fix is correct.
-
-### 🧪 Test Verification
-
-Run the project's tests after applying patches to provide additional confidence in the result.
-
-### 📊 Security Health Score
-
-Track the security state of a project through an easy-to-understand score.
-
-### 📸 Snapshot Timeline
-
-Keep track of different analysis states and security improvements over time.
-
-### 🔌 Developer API
-
-Access ProofCode capabilities through a developer-facing REST API.
-
----
-
-## 🎬 Example
-
-In our demo, ProofCode analyzes an **Express Payments & User API** project.
-
-### Before
-
-**Security Score: 40/100**
-
-The project contains multiple security vulnerabilities, including examples such as:
-
-- Unsafe dynamic code execution
-- Cross-site scripting risks
-
-### After Automated Patching
-
-**Security Score: 93/100**
-
-ProofCode reports:
-
-**5 open security vulnerabilities fixed**
-
-The codebase is then re-scanned and tested to verify the resulting state.
-
----
-
-## 🧠 Why ProofCode?
-
-Most AI coding tools focus on:
-
-> **"Can AI generate or modify this code?"**
-
-ProofCode focuses on:
-
-> **"Can we verify that the security problem was actually fixed?"**
-
-That's the core idea behind ProofCode.
-
-### Detect ≠ Fix ≠ Verify
-
-A vulnerability scanner can detect a problem.
-
-An AI coding assistant can generate a patch.
-
-ProofCode connects these steps into a single workflow and adds verification.
-
----
-
-## 🏗️ Architecture
-
-```text
-                   ┌─────────────────────┐
-                   │     Developer       │
-                   └──────────┬──────────┘
-                              │
-                              ▼
-                 ┌────────────────────────┐
-                 │   ProofCode Dashboard  │
-                 └────────────┬───────────┘
-                              │
-                 ┌────────────┴────────────┐
-                 │                         │
-                 ▼                         ▼
-        ┌─────────────────┐       ┌─────────────────┐
-        │ Repository Input│       │  Developer API  │
-        │ ZIP / GitHub    │       │                 │
-        └────────┬────────┘       └────────┬────────┘
-                 │                         │
-                 └────────────┬────────────┘
-                              ▼
-                   ┌─────────────────────┐
-                   │ Repository Analysis │
-                   │    / AST Layer      │
-                   └──────────┬──────────┘
-                              ▼
-                   ┌─────────────────────┐
-                   │ Security Detection  │
-                   └──────────┬──────────┘
-                              ▼
-                   ┌─────────────────────┐
-                   │   AI Patch Engine   │
-                   └──────────┬──────────┘
-                              ▼
-                   ┌─────────────────────┐
-                   │    Re-scan Code     │
-                   └──────────┬──────────┘
-                              ▼
-                   ┌─────────────────────┐
-                   │   Test Execution    │
-                   └──────────┬──────────┘
-                              ▼
-                   ┌─────────────────────┐
-                   │ Verification Result │
-                   └─────────────────────┘
-```
-
----
-
-## 🛠️ Tech Stack
-
-> Update this section to exactly match the technologies used in your implementation.
-
-### Frontend
-- React
-- TypeScript
-- Vite
-- Tailwind CSS
-
-### Backend / API
-- REST API
-- Repository analysis pipeline
-
-### Security / Analysis
-- AST-based code analysis
-- Security vulnerability detection
-- Automated patch generation
-- Re-scanning and verification
-
-### AI
-- AI-assisted vulnerability explanation
-- AI-assisted patch generation
-
----
-
-## 🚀 Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/proofcode.git
-cd proofcode
-```
-
-### 2. Install dependencies
+## Quick start
 
 ```bash
 npm install
+npm run dev            # http://localhost:3000
 ```
 
-### 3. Configure environment variables
+When no backend is needed (marketing walkthrough), start from **Home → View Demo**.
 
-Create a `.env` file and add the required configuration:
-
-```env
-# Add your project-specific environment variables here
-```
-
-### 4. Start the development server
+For a real analysis you also need a token (created automatically on first use) and, for AI fixes, a Gemini key:
 
 ```bash
-npm run dev
+cp .env.example .env.local   # then add your GEMINI_API_KEY
 ```
 
-Open the local development URL shown in your terminal.
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | — | Primary LLM fixer provider |
+| `GEMINI_MODEL` | `gemini-flash-latest` | Gemini model for line rewrites |
+| `OPENAI_API_KEY` | — | Optional fallback (OpenAI-compatible / OpenRouter) |
+| `OPENAI_BASE_URL` | `https://openrouter.ai/api/v1` | Fallback endpoint |
+| `PROOF_MODEL` | `openai/gpt-4o-mini` | Fallback model |
 
----
+`.env*` and `data/` are gitignored — never commit keys.
 
-## 📂 Project Structure
+## API (`/api/v1/*`)
 
-```text
-proofcode/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   ├── services/
-│   └── ...
-├── public/
-├── README.md
-├── package.json
-└── ...
+Read endpoints are public; write endpoints require a bearer token (`pk_*`, auto-created via `GET /api/v1/keys`).
+
+| Method & path | Auth | Purpose |
+| --- | --- | --- |
+| `GET/POST /api/v1/projects` | read public / write token | List or create (JSON `{url}` or `.zip` multipart) |
+| `GET/DELETE /api/v1/projects/[id]` | read public / write token | Read or delete a project |
+| `POST /api/v1/analyze` | token | Run a scan |
+| `POST /api/v1/issues/[issueId]/fix` | token | Fix one issue (deterministic → LLM) |
+| `POST /api/v1/fix-all` | token | Attempt every open fixable issue |
+| `POST /api/v1/verify` | token | Run tests + security re-scan, produce snapshot |
+| `GET/POST /api/v1/keys` | — | Fetch / create the workspace token |
+
+## Verification
+
+```bash
+npm run lint       # eslint — zero errors
+npm run build      # next build (Turbopack) — type-checks + builds
+node scripts/e2e-api.mjs   # full API E2E (server must be running)
 ```
 
-> Update the structure above to match the actual repository before publishing.
+## Project layout
 
----
-
-## 🎯 Use Cases
-
-ProofCode can be useful for:
-
-- 👨‍💻 Individual developers
-- ⚡ AI-assisted / vibe coding workflows
-- 🏢 Startups
-- 🔐 Security-conscious development teams
-- 🧪 Development and testing workflows
-- 🔌 Developer platforms integrating security checks
-
----
-
-## 🏆 Hackathon Pitch
-
-### The Problem
-
-AI makes it easier than ever to write software — but faster code generation can also introduce security problems.
-
-### The Solution
-
-ProofCode creates an automated loop that:
-
-**Finds → Explains → Fixes → Re-scans → Tests → Verifies**
-
-### The Difference
-
-We don't want developers to blindly trust an AI-generated patch.
-
-**We want to prove the fix.**
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1 — Current
-
-- [x] Repository analysis
-- [x] Vulnerability detection
-- [x] Vulnerability explanations
-- [x] Automated patching
-- [x] Re-scanning
-- [x] Test verification
-- [x] Security scoring
-- [x] Snapshot history
-- [x] Developer API
-
-### Phase 2 — Next
-
-- [ ] Pull Request security scanning
-- [ ] CI/CD integration
-- [ ] More programming languages
-- [ ] Improved patch confidence scoring
-- [ ] Continuous repository monitoring
-
-### Phase 3 — Vision
-
-Build an automated security layer for AI-generated software that continuously checks whether code remains secure as it evolves.
-
----
-
-## 🤝 Contributing
-
-Contributions, ideas, and feedback are welcome.
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test your changes
-5. Open a pull request
-
----
-
-## ⚠️ Disclaimer
-
-ProofCode is a developer security tool and should be used as one layer of a broader secure-development process.
-
-Automated analysis and patches should be reviewed and validated before being used in production environments.
-
----
-
-## 👥 Team
-
-Built with ❤️ for the hackathon.
-
-**ProofCode**
-
-> ### Don't just generate code.
-> ### Prove it's secure. 🔐
-
----
-
-## 📜 License
-
-Add your chosen open-source license here.
+- `lib/api/` — engine: `db` (JSON storage + token/health), `workspace` (clone/unzip/list), `scanner` (AST + heuristics), `fixer` (deterministic + Gemini), `verify` (tests + snapshot), `analyze`, `auth`.
+- `app/api/v1/` — Next.js route handlers for the API.
+- `lib/store.tsx` + `lib/mock-data.ts` — the in-browser mock demo (kept separate from the live API).
+- `app/` + `components/` — the UI (pages, shared components, live-mode components).
+- `scripts/e2e-api.mjs` — end-to-end API test.
+```

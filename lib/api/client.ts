@@ -1,0 +1,207 @@
+"use client";
+
+import type {
+  ApiProject,
+  ApiIssue,
+  ApiSnapshot,
+  ApiTest,
+} from "./types";
+
+const TOKEN_KEY = "proofcode_api_token";
+
+/**
+ * Base URL for the analysis API. When the UI is hosted separately from the
+ * engine (e.g. frontend on Vercel, engine on Fly.io), set
+ * `NEXT_PUBLIC_API_URL` to the engine's origin. Defaults to same-origin.
+ */
+const API_BASE = (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")
+  : ""
+).toString();
+
+function withBase(path: string): string {
+  return API_BASE ? `${API_BASE}${path}` : path;
+}
+
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: { method?: string; token?: string | null; body?: unknown; formData?: FormData } = {},
+): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  if (options.body !== undefined && !options.formData) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const res = await fetch(withBase(path), {
+    method: options.method ?? "GET",
+    headers,
+    body: options.formData
+      ? options.formData
+      : options.body !== undefined
+        ? JSON.stringify(options.body)
+        : undefined,
+  });
+
+  const text = await res.text();
+  let data: unknown = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+
+  if (!res.ok) {
+    let message = `Request failed with status ${res.status}`;
+    if (data && typeof data === "object" && "error" in data) {
+      const err = (data as { error?: unknown }).error;
+      if (typeof err === "string" && err.length > 0) message = err;
+    }
+    throw new ApiError(message, res.status);
+  }
+  return data as T;
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function storeToken(token: string): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+export async function fetchToken(): Promise<string> {
+  const data = await request<{ token: string }>("/api/v1/keys");
+  storeToken(data.token);
+  return data.token;
+}
+
+export async function ensureToken(): Promise<string> {
+  const existing = getStoredToken();
+  if (existing) return existing;
+  return fetchToken();
+}
+
+export type ProjectListItem = {
+  id: string;
+  name: string;
+  source: "url" | "upload";
+  language: string;
+  status: string;
+  health: number | null;
+  healthAfter: number | null;
+  fileCount: number;
+  createdAt: string;
+  lastAnalyzed: string | null;
+  issueCount: number;
+};
+
+export async function ensureAndWrap<T>(request: () => Promise<T>): Promise<T> {
+  try {
+    return await request();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 401) {
+      await fetchToken();
+      return request();
+    }
+    throw error;
+  }
+}
+
+export function listProjects(): Promise<{ projects: ProjectListItem[] }> {
+  return request<{ projects: ProjectListItem[] }>("/api/v1/projects");
+}
+
+export function getProjectLive(id: string): Promise<ApiProject> {
+  return request<ApiProject>(`/api/v1/projects/${id}`);
+}
+
+export function createProjectFromUrl(url: string): Promise<{ ok: true; project: ApiProject }> {
+  return request<{ ok: true; project: ApiProject }>("/api/v1/projects", {
+    method: "POST",
+    body: { url },
+  });
+}
+
+export function createProjectFromZip(file: File): Promise<{ ok: true; project: ApiProject }> {
+  const formData = new FormData();
+  formData.append("file", file, file.name);
+  return request<{ ok: true; project: ApiProject }>("/api/v1/projects", {
+    method: "POST",
+    formData,
+  });
+}
+
+export function analyzeProject(token: string, projectId: string): Promise<{ ok: true; project: ApiProject }> {
+  return request<{ ok: true; project: ApiProject }>("/api/v1/analyze", {
+    method: "POST",
+    token,
+    body: { projectId },
+  });
+}
+
+export interface FixOutcome {
+  ok: boolean;
+  issueId: string;
+  appliedToFile?: string;
+  beforeLine?: string;
+  afterLine?: string;
+  verified: boolean;
+  message: string;
+  usedLLM: boolean;
+}
+
+export function fixIssue(token: string, projectId: string, issueId: string): Promise<{ ok: boolean; outcome: FixOutcome }> {
+  return request<{ ok: boolean; outcome: FixOutcome }>(`/api/v1/issues/${issueId}/fix`, {
+    method: "POST",
+    token,
+    body: { projectId },
+  });
+}
+
+export function fixAll(token: string, projectId: string): Promise<{ ok: true; fixed: number; failed: number }> {
+  return request<{ ok: true; fixed: number; failed: number }>("/api/v1/fix-all", {
+    method: "POST",
+    token,
+    body: { projectId },
+  });
+}
+
+export interface VerifyOutcome {
+  ok: true;
+  result: "verified" | "failed" | "skipped";
+  snapshot: ApiSnapshot;
+  tests: ApiTest[];
+}
+
+export function verifyProjectLive(token: string, projectId: string): Promise<VerifyOutcome> {
+  return request<VerifyOutcome>("/api/v1/verify", {
+    method: "POST",
+    token,
+    body: { projectId },
+  });
+}
+
+export function deleteProjectLive(token: string, projectId: string): Promise<{ ok: true; deleted: string }> {
+  return request<{ ok: true; deleted: string }>(`/api/v1/projects/${projectId}`, {
+    method: "DELETE",
+    token,
+  });
+}
+
+export type { ApiProject, ApiIssue };
