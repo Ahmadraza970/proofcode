@@ -1,0 +1,350 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* ProofCode brand — single restrained accent, calm blue */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-dim: var(--brand-dim);
+
+  /* Severity indicators */
+  --color-critical: var(--severity-critical);
+  --color-high: var(--severity-high);
+  --color-medium: var(--severity-medium);
+  --color-low: var(--severity-low);
+
+  /* Green is reserved for verified / success only */
+  --color-verify: var(--verify);
+  --color-verify-dim: var(--verify-dim);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Light theme — warm white background, golden brand, chocolate ink */
+  --background: oklch(0.985 0.006 85);
+  --foreground: oklch(0.28 0.032 50);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.28 0.032 50);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.28 0.032 50);
+  --primary: oklch(0.3 0.04 50);
+  --primary-foreground: oklch(0.985 0.015 85);
+  --secondary: oklch(0.925 0.02 80);
+  --secondary-foreground: oklch(0.33 0.035 50);
+  --muted: oklch(0.945 0.015 85);
+  --muted-foreground: oklch(0.49 0.03 60);
+  --accent: oklch(0.925 0.025 80);
+  --accent-foreground: oklch(0.33 0.035 50);
+  --destructive: oklch(0.53 0.2 27);
+  --border: oklch(0.9 0.02 80);
+  --input: oklch(0.885 0.02 80);
+  --ring: oklch(0.7 0.12 80);
+  --chart-1: oklch(0.63 0.13 75);
+  --chart-2: oklch(0.53 0.08 50);
+  --chart-3: oklch(0.74 0.1 90);
+  --chart-4: oklch(0.45 0.1 30);
+  --chart-5: oklch(0.55 0.17 55);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0.006 85);
+  --sidebar-foreground: oklch(0.28 0.032 50);
+  --sidebar-primary: oklch(0.68 0.13 80);
+  --sidebar-primary-foreground: oklch(0.22 0.035 55);
+  --sidebar-accent: oklch(0.925 0.025 80);
+  --sidebar-accent-foreground: oklch(0.33 0.035 50);
+  --sidebar-border: oklch(0.9 0.02 80);
+  --sidebar-ring: oklch(0.7 0.12 80);
+
+  --brand: oklch(0.66 0.13 78);
+  --brand-foreground: oklch(0.24 0.035 55);
+  --brand-dim: oklch(0.66 0.13 78 / 15%);
+  --verify: oklch(0.56 0.13 152);
+  --verify-dim: oklch(0.56 0.13 152 / 14%);
+  --severity-critical: oklch(0.53 0.2 27);
+  --severity-high: oklch(0.62 0.17 55);
+  --severity-medium: oklch(0.6 0.11 75);
+  --severity-low: oklch(0.5 0.03 70);
+
+  /* Code / terminal panels — dark chocolate in both themes */
+  --code-bg: oklch(0.16 0.018 60);
+  --code-fg: oklch(0.9 0.015 80);
+}
+
+.dark {
+  /* Dark theme — deep chocolate, warm surfaces, bright gold brand */
+  --background: oklch(0.16 0.02 55);
+  --foreground: oklch(0.97 0.008 85);
+  --card: oklch(0.2 0.02 55);
+  --card-foreground: oklch(0.97 0.008 85);
+  --popover: oklch(0.22 0.022 55);
+  --popover-foreground: oklch(0.97 0.008 85);
+  --primary: oklch(0.97 0.008 85);
+  --primary-foreground: oklch(0.2 0.02 55);
+  --secondary: oklch(0.25 0.022 55);
+  --secondary-foreground: oklch(0.97 0.008 85);
+  --muted: oklch(0.26 0.022 55);
+  --muted-foreground: oklch(0.7 0.025 80);
+  --accent: oklch(0.28 0.03 55);
+  --accent-foreground: oklch(0.98 0.008 85);
+  --destructive: oklch(0.64 0.2 30);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.75 0.12 85);
+  --chart-1: oklch(0.77 0.1 85);
+  --chart-2: oklch(0.65 0.08 55);
+  --chart-3: oklch(0.84 0.12 90);
+  --chart-4: oklch(0.6 0.09 40);
+  --chart-5: oklch(0.7 0.18 60);
+  --sidebar: oklch(0.2 0.02 55);
+  --sidebar-foreground: oklch(0.97 0.008 85);
+  --sidebar-primary: oklch(0.78 0.12 85);
+  --sidebar-primary-foreground: oklch(0.22 0.035 55);
+  --sidebar-accent: oklch(0.25 0.022 55);
+  --sidebar-accent-foreground: oklch(0.98 0.008 85);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-ring: oklch(0.75 0.12 85);
+
+  --brand: oklch(0.78 0.12 85);
+  --brand-foreground: oklch(0.22 0.035 55);
+  --brand-dim: oklch(0.78 0.12 85 / 15%);
+  --verify: oklch(0.72 0.13 155);
+  --verify-dim: oklch(0.72 0.13 155 / 14%);
+  --severity-critical: oklch(0.66 0.21 30);
+  --severity-high: oklch(0.73 0.18 55);
+  --severity-medium: oklch(0.8 0.12 85);
+  --severity-low: oklch(0.7 0.03 70);
+
+  --code-bg: oklch(0.13 0.02 55);
+  --code-fg: oklch(0.93 0.01 85);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+}
+
+/* Keep native form controls + scrollbars in step with the theme */
+html {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
+/* Theme swap should feel one-step, so colour transitions are cheap */
+body,
+header,
+footer,
+main,
+section,
+article,
+aside {
+  transition:
+    background-color 0.25s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+code,
+pre,
+kbd,
+[class*="font-mono"] {
+  font-variant-ligatures: none;
+}
+
+::selection {
+  background-color: var(--brand);
+  color: var(--brand-foreground);
+}
+
+/* ---- ProofCode motion ---- */
+
+/* Soft entrance for page sections — `.reveal` with optional `--reveal-delay` */
+.reveal {
+  opacity: 0;
+  transform: translateY(12px);
+  animation:
+    pc-fade-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms)
+    forwards;
+}
+@keyframes pc-fade-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Active agent step pulse */
+.pc-step-pulse {
+  position: relative;
+}
+.pc-step-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid var(--brand);
+  opacity: 0;
+  animation: pc-pulse 1.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+@keyframes pc-pulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+/* Check pop-in when a step completes / verification succeeds */
+.pc-check-pop {
+  animation: pc-check-pop 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes pc-check-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  60% {
+    transform: scale(1.15);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Terminal caret blink */
+.pc-caret::after {
+  content: "▍";
+  margin-left: 2px;
+  color: var(--brand);
+  animation: pc-blink 1s step-end infinite;
+}
+@keyframes pc-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Subtle background grid for hero/code-adjacent areas */
+.bg-grid {
+  background-image:
+    linear-gradient(
+      to right,
+      var(--border) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      var(--border) 1px,
+      transparent 1px
+    );
+  background-size: 44px 44px;
+}
+
+/* Thin, quiet scrollbars for code/terminal panels */
+.code-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.code-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.code-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+  border-radius: 9999px;
+}
+.code-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .pc-step-pulse::before,
+  .pc-caret::after {
+    animation: none;
+    opacity: 0;
+  }
+  .pc-check-pop {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  body,
+  header,
+  footer,
+  main,
+  section,
+  article,
+  aside {
+    transition: none;
+  }
+}

@@ -1,0 +1,40 @@
+# fly.toml — ProofCode analysis engine host (Node/Next service on Fly.io).
+app = "proofcode-engine"
+
+# Uses the Dockerfile in the repo root when deploying from git:
+#   fly launch
+#   fly secrets set SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=...
+#   fly secrets set GEMINI_API_KEY=... GEMINI_MODEL=...
+#   fly volumes create proofcode_scratch --region <region>
+#   fly deploy
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  SCRATCH_DIR = "/data"
+
+[[services]]
+  internal_port = 8080
+  processes = ["app"]
+  protocol = "tcp"
+
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 100
+    soft_limit = 50
+
+  [[services.ports]]
+    handlers = ["http"]
+    port = 80
+    force_https = true
+
+  [[services.ports]]
+    handlers = ["tls"]
+    port = 443
+
+# Persistent workspace so analyze/fix/verify see the checked-out source
+# across requests and restarts. Create the volume once before first deploy:
+#   fly volumes create proofcode_scratch --region <region>
+[[mounts]]
+  source = "proofcode_scratch"
+  destination = "/data"
