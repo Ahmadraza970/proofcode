@@ -92,7 +92,114 @@ function parseReplacement(content: string): string | null {
   }
 }
 
-/** Calls Google Gemini (flash) to fix the risky line. */
+/** Error from a single Gemini attempt; `status` is set when an HTTP response came back. */
+class GeminiCallError extends Error {
+  status?: number;
+  retryable: boolean;
+
+  constructor(message: string, opts: { status?: number; retryable: boolean }) {
+    super(message);
+    this.name = "GeminiCallError";
+    this.status = opts.status;
+    this.retryable = opts.retryable;
+  }
+}
+
+/** Pull the human-readable detail out of a Google error body (no raw JSON soup). */
+function geminiErrorDetail(status: number, body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: unknown; status?: unknown } };
+    if (typeof parsed.error?.message === "string") {
+      const statusText = typeof parsed.error?.status === "string" ? ` ${parsed.error.status}` : "";
+      return `Gemini request failed (${status}${statusText}): ${parsed.error.message}`;
+    }
+  } catch {
+    /* fall through to the trimmed raw body */
+  }
+  const trimmed = body.replace(/\s+/g, " ").trim().slice(0, 200);
+  return `Gemini request failed (${status})${trimmed ? `: ${trimmed}` : ""}`;
+}
+
+/**
+ * Gemini models to try, in order: the configured/default flash model first,
+ * then the lighter free flash-lite model as the overload fallback — and the
+ * other way round when the lite model is the configured one.
+ */
+function geminiModelChain(): string[] {
+  const primary = process.env.GEMINI_MODEL || "gemini-flash-latest";
+  const chain = [primary, "gemini-3.5-flash-lite", "gemini-flash-latest"].filter(
+    (model, idx, all) => all.indexOf(model) === idx,
+  );
+  return chain.slice(0, 2);
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** One Gemini attempt against one model. Throws GeminiCallError on failure. */
+async function geminiAttempt(
+  model: string,
+  prompt: string,
+  apiKey: string,
+  timeoutMs: number,
+): Promise<string | null> {
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+    );
+  } catch (error) {
+    // Transport failure / timeout — no HTTP status came back. An overloaded
+    // service often just hangs or drops, so treat this as transient.
+    const detail = error instanceof Error ? error.message : "network error";
+    throw new GeminiCallError(`Gemini request failed: ${detail}`, { retryable: true });
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    // Only overload / rate-limit responses are worth retrying; a 400 or an
+    // auth error will fail identically every time, so those fail fast.
+    const retryable = res.status === 503 || res.status === 429;
+    throw new GeminiCallError(geminiErrorDetail(res.status, body), {
+      status: res.status,
+      retryable,
+    });
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const content = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  return parseReplacement(content);
+}
+
+// The fix routes set maxDuration = 60s; keep the whole Gemini chain (retries
+// + model fallback) comfortably inside that, leaving headroom for the file
+// patch and rescan that follow a successful fix.
+const GEMINI_BUDGET_MS = 50_000;
+const GEMINI_ATTEMPT_TIMEOUT_MS = 20_000;
+const GEMINI_RETRY_BACKOFF_MS = [1_500, 4_000]; // waits before retry 1 and 2, per model
+
+/**
+ * Calls Google Gemini to fix the risky line, resilient to free-tier overload:
+ * each model gets up to 2 retries with short backoff on 503/429 (or a dropped
+ * connection), then the chain falls back to the next model. When everything
+ * is exhausted, the thrown message says plainly that the AI service is
+ * overloaded and keeps the provider's own detail for the result panel.
+ */
 async function geminiCorrectLine(
   args: {
     issue: ApiIssue;
@@ -103,37 +210,56 @@ async function geminiCorrectLine(
   },
   apiKey: string,
 ): Promise<string | null> {
-  const model = process.env.GEMINI_MODEL || "gemini-flash-latest";
   const prompt = buildPrompt(args);
+  const models = geminiModelChain();
+  const deadline = Date.now() + GEMINI_BUDGET_MS;
+  let lastError: GeminiCallError | null = null;
+  let stop = false;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.1,
-          responseMimeType: "application/json",
-        },
-      }),
-      signal: AbortSignal.timeout(45_000),
-    },
-  );
-
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`Gemini request failed (${res.status}): ${body.slice(0, 200)}`);
+  for (const model of models) {
+    if (stop) break;
+    for (let attempt = 0; attempt <= GEMINI_RETRY_BACKOFF_MS.length; attempt++) {
+      if (attempt > 0) {
+        const backoff = GEMINI_RETRY_BACKOFF_MS[attempt - 1];
+        if (Date.now() + backoff >= deadline) {
+          stop = true;
+          break;
+        }
+        await sleep(backoff);
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 1_000) {
+        stop = true;
+        break;
+      }
+      try {
+        return await geminiAttempt(
+          model,
+          prompt,
+          apiKey,
+          Math.min(GEMINI_ATTEMPT_TIMEOUT_MS, remaining),
+        );
+      } catch (error) {
+        const callError =
+          error instanceof GeminiCallError
+            ? error
+            : new GeminiCallError(
+                `Gemini request failed: ${error instanceof Error ? error.message : "unknown error"}`,
+                { retryable: true },
+              );
+        lastError = callError;
+        if (!callError.retryable) throw callError; // 400/auth/etc — fail fast, as before
+      }
+    }
   }
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const content = data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-  return parseReplacement(content);
+
+  // Every model and retry is exhausted (or the time budget ran out).
+  if (lastError?.retryable) {
+    throw new Error(
+      `The AI fix service is overloaded right now, so this fix could not run — please try again in a minute. (${lastError.message}; tried ${models.join(" and ")})`,
+    );
+  }
+  throw lastError ?? new Error("Gemini request failed");
 }
 
 /** Calls any OpenAI-compatible endpoint (OpenRouter, etc.). */
