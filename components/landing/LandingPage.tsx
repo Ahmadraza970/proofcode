@@ -228,6 +228,14 @@ export function LandingPage() {
                   Sign in with Google
                 </Link>
               </Button>
+              {APK_DOWNLOAD_URL ? (
+                <Button asChild variant="outline" size="lg" className="h-11 px-5">
+                  <a href={APK_DOWNLOAD_URL}>
+                    <Download className="size-4" aria-hidden="true" />
+                    Download the Android app
+                  </a>
+                </Button>
+              ) : null}
             </div>
             <p className="mt-4 text-sm text-muted-foreground">
               Free to use. Your projects stay private to your account.
