@@ -135,7 +135,7 @@ export async function verifyProject(project: ApiProject): Promise<VerifyOutcome>
     tests = [
       { name: command.join(" "), status: run.status, duration: run.duration },
       {
-        name: "security re-scan",
+        name: "critical findings check",
         status: project.issues.some((i) => i.status === "open" && i.severity === "critical") ? "failed" : "passed",
         duration: "instant",
       },
@@ -144,7 +144,7 @@ export async function verifyProject(project: ApiProject): Promise<VerifyOutcome>
   } else {
     tests = [
       {
-        name: "security re-scan",
+        name: "critical findings check",
         status: project.issues.some((i) => i.status === "open" && i.severity === "critical") ? "failed" : "passed",
         duration: "instant",
       },
