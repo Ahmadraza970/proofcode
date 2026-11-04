@@ -14,7 +14,7 @@ function VerifyContent() {
   const liveId = searchParams.get("live");
 
   if (liveId) {
-    return <LiveVerify projectId={liveId} />;
+    return <LiveVerify id={liveId} />;
   }
 
   return (

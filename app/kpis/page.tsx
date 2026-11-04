@@ -172,7 +172,7 @@ export default function KPIsPage() {
     for (const project of projects) {
       for (const score of project.scores) {
         const entry = totals.get(score.label) ?? { sum: 0, count: 0 };
-        entry.sum += score.value;
+        entry.sum += score.after;
         entry.count += 1;
         totals.set(score.label, entry);
       }
