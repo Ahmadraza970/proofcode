@@ -45,7 +45,7 @@ const STEPS: {
   {
     icon: Wrench,
     title: "Patch",
-    body: "Fix Issue writes the corrected code and shows the before and after lines. When an AI model is busy, a fallback model takes over instead of failing the fix.",
+    body: "Fix Issue writes the corrected code and shows the before and after lines. When an AI model is busy, the request retries and a fallback model takes over.",
   },
   {
     icon: RefreshCw,
