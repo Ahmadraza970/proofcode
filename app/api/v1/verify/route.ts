@@ -27,6 +27,27 @@ export async function POST(request: Request): Promise<Response> {
       return jsonError("Unknown projectId", 404);
     }
 
+    // A project whose analysis found nothing scannable carries no health
+    // score. Verifying it would mint a fake perfect score from an empty
+    // issue list, so the verification is honestly skipped instead.
+    if (project.health === null && project.status === "analyzed") {
+      return NextResponse.json({
+        ok: true,
+        result: "skipped",
+        reason: "This project was not scanned (no supported code files), so there is nothing to verify yet.",
+        snapshot: {
+          date: new Date().toISOString(),
+          label: "Not scanned — verification skipped",
+          health: 0,
+          critical: 0,
+          high: 0,
+          medium: 0,
+          result: "skipped",
+        },
+        tests: [],
+      });
+    }
+
     const outcome = await verifyProject(project);
     const history = [...(project.history ?? []), outcome.snapshot];
 

@@ -384,11 +384,23 @@ export interface ScanSummary {
   issues: ApiIssue[];
   language: string;
   fileCount: number;
+  coverage: {
+    /** Files that were read and checked (at minimum by the secrets scan). */
+    scannedFiles: number;
+    /** Files a code detector (JS/TS AST or Python) actually ran over. */
+    codeFiles: number;
+    /** Every file present in the workspace. */
+    totalFiles: number;
+    /** Unscannable code extensions seen, by count (e.g. { ".php": 12 }). */
+    unsupported: Record<string, number>;
+    oversizeSkipped: number;
+  };
 }
 
 /** Runs every detector over the project workspace and returns real findings. */
 export async function scanWorkspace(id: string): Promise<ScanSummary> {
-  const files = await listSourceFiles(id);
+  const { files, unsupported, totalSeen, oversizeSkipped } = await listSourceFiles(id);
+  let codeFiles = 0;
   const issueInputs: IssueInput[] = [];
   const candidatesAll: ApiIssue[] = [];
   const seen = new Set<string>();
@@ -407,9 +419,11 @@ export async function scanWorkspace(id: string): Promise<ScanSummary> {
 
     const candidates: IssueInput[] = [];
     if ([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"].includes(file.ext)) {
+      codeFiles += 1;
       candidates.push(...scanJsTs(source, file.relPath));
     }
     if (file.ext === ".py") {
+      codeFiles += 1;
       candidates.push(...scanPython(source, file.relPath));
     }
     candidates.push(...scanSecrets(source, file.relPath));
@@ -435,7 +449,13 @@ export async function scanWorkspace(id: string): Promise<ScanSummary> {
 
   candidatesAll.push(...issueInputs.map((i) => makeIssue(i)));
   candidatesAll.sort((a, b) => severityRank(a) - severityRank(b) || a.fileName.localeCompare(b.fileName) || a.line - b.line);
-  return { issues: candidatesAll, language, fileCount: files.filter((f) => !f.skipped).length };
+  const scannedFiles = files.filter((f) => !f.skipped).length;
+  return {
+    issues: candidatesAll,
+    language,
+    fileCount: scannedFiles,
+    coverage: { scannedFiles, codeFiles, totalFiles: totalSeen, unsupported, oversizeSkipped },
+  };
 }
 
 function severityRank(i: ApiIssue): number {

@@ -25,6 +25,7 @@ export function HealthRing({
   label,
   sub,
   delta,
+  display,
   className,
 }: {
   score: number;
@@ -33,6 +34,8 @@ export function HealthRing({
   label?: string;
   sub?: string;
   delta?: number;
+  /** Overrides the centre number (e.g. "—" when no score exists). */
+  display?: string;
   className?: string;
 }) {
   const radius = (size - stroke) / 2;
@@ -43,7 +46,7 @@ export function HealthRing({
     <div
       className={cn("inline-flex flex-col items-center gap-2", className)}
       role="img"
-      aria-label={`Health score ${score} out of 100`}
+      aria-label={display ? (label ?? "No health score") : `Health score ${score} out of 100`}
     >
       <div className="relative" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
@@ -71,11 +74,11 @@ export function HealthRing({
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
             className="font-mono text-4xl font-semibold tabular-nums tracking-tight"
-            style={{ color: healthColor(score) }}
+            style={{ color: display ? "var(--muted-foreground)" : healthColor(score) }}
           >
-            {score}
+            {display ?? score}
           </span>
-          <span className="font-mono text-xs text-muted-foreground">/100</span>
+          {!display && <span className="font-mono text-xs text-muted-foreground">/100</span>}
         </div>
       </div>
       {label && <span className="text-sm font-medium">{label}</span>}

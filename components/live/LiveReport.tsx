@@ -10,6 +10,7 @@ import {
   Loader2,
   RefreshCw,
   SearchCheck,
+  ShieldAlert,
   ShieldCheck,
   TerminalSquare,
 } from "lucide-react";
@@ -229,9 +230,32 @@ export function LiveReport({ id }: { id: string }) {
     low: openIssues.filter((i) => i.severity === "low").length,
   };
   const score = project.health ?? 0;
+  // An analyzed project with no health score was never actually scanned
+  // (no JavaScript, TypeScript or Python files — e.g. a PHP repo). It must
+  // be presented as "not scanned", never as a clean 100 or a critical 0.
+  const notScanned = project.health === null && project.status === "analyzed";
 
   return (
     <div className="flex flex-col gap-8">
+      {notScanned && (
+        <Card className="border-medium/40 bg-medium/10">
+          <CardContent className="flex items-start gap-3 p-5">
+            <ShieldAlert className="mt-0.5 size-5 shrink-0 text-medium" aria-hidden="true" />
+            <div>
+              <p className="font-semibold">This project was not scanned</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No JavaScript, TypeScript or Python files were found
+                {project.language && project.language !== "Mixed"
+                  ? <> — the code is mostly {project.language}, which ProofCode cannot read yet</>
+                  : null}
+                . No health score was given, because an unscanned project is
+                never labelled clean. Upload a JavaScript, TypeScript or
+                Python project to get real findings.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Health hero */}
       <Card className="relative overflow-hidden">
         <div
@@ -241,8 +265,9 @@ export function LiveReport({ id }: { id: string }) {
         <CardContent className="flex flex-col items-center gap-8 p-6 sm:p-8 lg:flex-row lg:gap-12">
           <HealthRing
             score={score}
+            display={notScanned ? "—" : undefined}
             label="Project Health"
-            sub={healthLabel(score)}
+            sub={notScanned ? "Not scanned" : healthLabel(score)}
             size={168}
           />
           <div className="flex-1 self-stretch">
@@ -307,8 +332,14 @@ export function LiveReport({ id }: { id: string }) {
             )}
             <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
               <Activity className="size-4" aria-hidden="true" />
-              {project.language} · {project.fileCount} files scanned ·{" "}
-              {project.issues.length} total findings
+              {notScanned ? (
+                <>{project.language} · no supported code files found · nothing scanned</>
+              ) : (
+                <>
+                  {project.language} · {project.fileCount} files scanned ·{" "}
+                  {project.issues.length} total findings
+                </>
+              )}
             </p>
           </div>
         </CardContent>
@@ -366,11 +397,19 @@ export function LiveReport({ id }: { id: string }) {
 
         <div className="mt-4">
           {openIssues.length === 0 ? (
-            <EmptyState
-              icon={<SearchCheck className="size-6" aria-hidden="true" />}
-              title="No open findings"
-              description="Your project passed the current checks. Run a verification to record a snapshot."
-            />
+            notScanned ? (
+              <EmptyState
+                icon={<ShieldAlert className="size-6" aria-hidden="true" />}
+                title="Nothing was scanned"
+                description="This project has no JavaScript, TypeScript or Python code, so there are no findings to show — that is not the same as passing."
+              />
+            ) : (
+              <EmptyState
+                icon={<SearchCheck className="size-6" aria-hidden="true" />}
+                title="No open findings"
+                description="Your project passed the current checks. Run a verification to record a snapshot."
+              />
+            )
           ) : issues.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No {filter} issues.

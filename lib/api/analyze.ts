@@ -13,6 +13,33 @@ import type { ApiProject } from "./types";
 
 export type SourceSpec = { kind: "url"; url: string } | { kind: "upload"; file: ArrayBuffer };
 
+const UNSUPPORTED_LANGUAGE_NAMES: Record<string, string> = {
+  ".php": "PHP",
+  ".java": "Java",
+  ".go": "Go",
+  ".rb": "Ruby",
+  ".rs": "Rust",
+  ".cs": "C#",
+  ".swift": "Swift",
+  ".kt": "Kotlin",
+  ".c": "C",
+  ".cpp": "C++",
+  ".sql": "SQL",
+};
+
+/** Names the language most of the unscannable files are written in, if any. */
+function dominantUnsupportedLanguage(unsupported: Record<string, number>): string | null {
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [ext, count] of Object.entries(unsupported)) {
+    if (count > bestCount && UNSUPPORTED_LANGUAGE_NAMES[ext]) {
+      best = UNSUPPORTED_LANGUAGE_NAMES[ext];
+      bestCount = count;
+    }
+  }
+  return best;
+}
+
 function deriveName(source: SourceSpec): string {
   if (source.kind === "url") {
     const trimmed = source.url.replace(/\.git$/, "").split("?")[0];
@@ -107,17 +134,24 @@ export async function runAnalysis(id: string): Promise<ApiProject> {
     return (await updateProject(id, { status: "error", error: "The scanner could not read the workspace." }))!;
   }
 
-  const health = computeHealth(summary.issues);
+  const { coverage } = summary;
+  // Honest-scan rule: when no code file could be scanned at all (e.g. a PHP
+  // or Java repo — ProofCode reads JavaScript, TypeScript and Python), the
+  // project must NOT be labelled clean with a perfect score. No score is
+  // recorded, and the language names what was actually found so the report
+  // can say plainly that nothing was scanned.
+  const notScanned = coverage.codeFiles === 0 && summary.issues.length === 0;
+  const health = notScanned ? null : computeHealth(summary.issues);
   const analyzed: ApiProject = {
     ...project,
     status: "analyzed",
-    language: summary.language,
+    language: notScanned ? (dominantUnsupportedLanguage(coverage.unsupported) ?? summary.language) : summary.language,
     fileCount: summary.fileCount,
     issues: summary.issues,
     lastAnalyzed: new Date().toISOString(),
     health,
     healthAfter: health,
-    scores: computeScores({ ...project, issues: summary.issues }),
+    scores: notScanned ? [] : computeScores({ ...project, issues: summary.issues }),
     // Preserve snapshots from earlier runs — re-analysis appends to the
     // project's history instead of wiping it.
     history: project.history ?? [],

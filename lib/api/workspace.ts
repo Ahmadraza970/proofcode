@@ -138,9 +138,28 @@ export interface ObservedFile {
   skipped: boolean;
 }
 
-export async function listSourceFiles(id: string): Promise<ObservedFile[]> {
+/** What the workspace walk saw, beyond the scannable file list itself. */
+export interface WorkspaceObservation {
+  files: ObservedFile[];
+  /** Extensions seen but not scanned (code languages ProofCode cannot read yet), by count. */
+  unsupported: Record<string, number>;
+  /** Every file encountered, scanned or not. */
+  totalSeen: number;
+  /** Files skipped for exceeding the per-file size cap. */
+  oversizeSkipped: number;
+}
+
+const NON_CODE_EXTS = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".avif", ".bmp",
+  ".mp4", ".mov", ".mp3", ".wav", ".ogg", ".webm",
+  ".zip", ".gz", ".tgz", ".bz2", ".xz", ".7z", ".rar", ".pdf",
+  ".woff", ".woff2", ".ttf", ".eot", ".otf", ".map", ".lock", ".bin",
+]);
+
+export async function listSourceFiles(id: string): Promise<WorkspaceObservation> {
   const root = workspaceDir(id);
   const results: ObservedFile[] = [];
+  const unsupported: Record<string, number> = {};
   const stats = { files: 0, bytes: 0 };
   const skippedStat = { count: 0 };
 
@@ -173,7 +192,12 @@ export async function listSourceFiles(id: string): Promise<ObservedFile[]> {
           results.push({ filePath: abs, relPath: relPosix, ext, size, skipped: true });
           continue;
         }
-        if (!SOURCE_EXTENSIONS.has(ext)) continue;
+        if (!SOURCE_EXTENSIONS.has(ext)) {
+          if (ext && !NON_CODE_EXTS.has(ext)) {
+            unsupported[ext] = (unsupported[ext] ?? 0) + 1;
+          }
+          continue;
+        }
         stats.bytes += size;
         results.push({ filePath: abs, relPath: relPosix, ext, size, skipped: false });
       }
@@ -181,7 +205,7 @@ export async function listSourceFiles(id: string): Promise<ObservedFile[]> {
   }
 
   await walk(root, "");
-  return results;
+  return { files: results, unsupported, totalSeen: stats.files, oversizeSkipped: skippedStat.count };
 }
 
 /**
@@ -194,7 +218,7 @@ export async function listSourceFiles(id: string): Promise<ObservedFile[]> {
  */
 export async function captureProjectFiles(id: string): Promise<void> {
   try {
-    const observed = await listSourceFiles(id);
+    const { files: observed } = await listSourceFiles(id);
     const files: Record<string, string> = {};
     let total = 0;
     for (const file of observed) {
@@ -231,7 +255,7 @@ function safeWorkspaceJoin(root: string, relPath: string): string | null {
  */
 export async function ensureWorkspaceFiles(id: string): Promise<boolean> {
   try {
-    const existing = await listSourceFiles(id);
+    const { files: existing } = await listSourceFiles(id);
     if (existing.some((f) => !f.skipped)) return true;
   } catch {
     /* fall through to the durable copy */
