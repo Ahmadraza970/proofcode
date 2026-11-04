@@ -251,40 +251,4 @@ export function deleteProjectLive(token: string | null, projectId: string): Prom
   });
 }
 
-export interface GuestIssue {
-  detector: string;
-  severity: string;
-  title: string;
-  explanation: string;
-  line: number;
-  fileName: string;
-  fixAvailable: "auto" | "llm" | "none";
-}
-
-export interface GuestFixResult {
-  ok: true;
-  health: number;
-  issues: GuestIssue[];
-  fixedCode: string | null;
-  summary: string | null;
-  aiFix: "done" | "needs-key" | "failed";
-  aiError: string | null;
-}
-
-/**
- * Guest mode ("Fix my code"): stateless scan + optional AI repair of one
- * pasted file. No workspace token is needed; the visitor's own key, when
- * saved, rides in the header via `request`.
- */
-export function guestFix(input: {
-  code: string;
-  fileName: string;
-  errorMessage?: string;
-}): Promise<GuestFixResult> {
-  return request<GuestFixResult>("/api/v1/guest/fix", {
-    method: "POST",
-    body: input,
-  });
-}
-
 export type { ApiProject, ApiIssue };

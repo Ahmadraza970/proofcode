@@ -56,11 +56,6 @@ export default function PrivacyPage() {
             workspace on our server, where the analysis runs.
           </p>
           <p>
-            On the &ldquo;Fix my code&rdquo; page you can also paste a single
-            file as a guest. Guest submissions are scanned in memory only —
-            they are never written to the workspace or the database.
-          </p>
-          <p>
             Please do not upload secrets — API keys, passwords, or production
             credentials should never be part of a submission.
           </p>
@@ -74,9 +69,6 @@ export default function PrivacyPage() {
             results, and verification history snapshots. The workspace copy of
             your code exists only so analysis, fixes, and verification can run
             against it.
-          </p>
-          <p>
-            Guest mode stores nothing at all: no project, no code, no results.
           </p>
         </Section>
 
