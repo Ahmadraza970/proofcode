@@ -322,8 +322,10 @@ export function scanPython(source: string, relPath: string): IssueInput[] {
 /* ------------------------------------------------------------------ */
 /* Language pack (2026-11-05): PHP, Java, C/C++, HTML and CSS.         */
 /* Line-pattern detectors in the same style as the Python pack.        */
-/* fixAvailable stays "none" — no automated fix is offered for these   */
-/* languages yet, rather than pretending one exists.                   */
+/* fixAvailable is "llm" (added later on 2026-11-05): the AI fixer     */
+/* drafts a one-line patch in the file's own language, and the fix is  */
+/* only called verified when this same scanner stops flagging the     */
+/* patched line — never on the model's word alone.                     */
 /* ------------------------------------------------------------------ */
 
 type PatternRule = {
@@ -353,7 +355,7 @@ function runPatternRules(source: string, relPath: string, rules: PatternRule[]):
         line,
         column: (m.index ?? 0) - lineStartOffset(lines, line),
         category: r.category,
-        fixAvailable: "none",
+        fixAvailable: "llm",
         fixSuggested: r.fixSuggested,
       });
     }

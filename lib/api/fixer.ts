@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { workspaceDir } from "./db";
 import { ensureWorkspaceFiles, persistProjectFile } from "./workspace";
-import { scanJsTs, scanPython, scanSecrets } from "./scanner";
+import { scanJsTs, scanPython, scanPhp, scanJava, scanC, scanHtml, scanCss, scanSecrets } from "./scanner";
 import type { ApiIssue } from "./types";
 
 export interface FixOutcome {
@@ -43,6 +43,18 @@ function deterministicPatch(source: string, line: number): { target: number; aft
   return { target: idx, after };
 }
 
+/** The language name the fix prompt uses, from the file's extension. */
+function languageForFile(fileName: string): string {
+  const ext = path.extname(fileName).toLowerCase();
+  if (ext === ".py") return "Python";
+  if (ext === ".php") return "PHP";
+  if (ext === ".java") return "Java";
+  if ([".c", ".h", ".cpp", ".cc", ".cxx", ".hpp"].includes(ext)) return "C/C++";
+  if (ext === ".html") return "HTML";
+  if (ext === ".css") return "CSS";
+  return "JavaScript/TypeScript";
+}
+
 /** The fix prompt: the flagged line plus two lines of context either side. */
 function buildPrompt(args: {
   issue: ApiIssue;
@@ -57,7 +69,7 @@ function buildPrompt(args: {
 ISSUE: ${issue.title}
 DETAILS: ${issue.explanation}
 WHY: ${issue.whyItMatters}
-TYPE: ${issue.detector}
+TYPE: ${issue.detector}${issue.fixSuggested ? `\nSUGGESTED FIX: ${issue.fixSuggested}` : ""}
 
 FILE LINE (line ${issue.line}):
 \`\`\`
@@ -254,12 +266,16 @@ async function geminiCorrectLine(
         break;
       }
       try {
-        return await geminiAttempt(
+        const replacement = await geminiAttempt(
           model,
           prompt,
           apiKey,
           Math.min(GEMINI_ATTEMPT_TIMEOUT_MS, remaining),
         );
+        // A null result means this model produced no usable line — that is
+        // exactly the case the chain exists for, so fall through to the
+        // next attempt / escalation model instead of giving up here.
+        if (replacement) return replacement;
       } catch (error) {
         const callError =
           error instanceof GeminiCallError
@@ -284,7 +300,10 @@ async function geminiCorrectLine(
       `The AI fix service is overloaded right now, so this fix could not run — please try again in a minute. (${lastError.message}; tried ${models.join(" and ")})`,
     );
   }
-  throw lastError ?? new Error("Gemini request failed");
+  if (lastError) throw lastError;
+  // No error occurred — every model answered but none produced a usable
+  // replacement line. That is an honest "could not fix", not a failure.
+  return null;
 }
 
 /** Calls any OpenAI-compatible endpoint (OpenRouter, etc.). */
@@ -358,7 +377,18 @@ async function rescanDetector(
   try {
     const abs = path.join(workspaceDir(id), relPath);
     const source = await fs.readFile(abs, "utf8");
-    const candidates = [...scanJsTs(source, relPath), ...(ext === ".py" ? scanPython(source, relPath) : []), ...scanSecrets(source, relPath)];
+    // Mirror scanWorkspace's per-language dispatch, so a fix in ANY
+    // supported language is verified by the same detectors that flagged
+    // it — previously only JS/TS, Python and secrets were re-checked,
+    // which would have called every PHP/Java/C fix "verified" blindly.
+    const candidates = [...scanSecrets(source, relPath)];
+    if ([".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs"].includes(ext)) candidates.push(...scanJsTs(source, relPath));
+    if (ext === ".py") candidates.push(...scanPython(source, relPath));
+    if (ext === ".php") candidates.push(...scanPhp(source, relPath));
+    if (ext === ".java") candidates.push(...scanJava(source, relPath));
+    if ([".c", ".h", ".cpp", ".cc", ".cxx", ".hpp"].includes(ext)) candidates.push(...scanC(source, relPath));
+    if (ext === ".html") candidates.push(...scanHtml(source, relPath));
+    if (ext === ".css") candidates.push(...scanCss(source, relPath));
     return !candidates.some((c) => c.detector === detector && c.line === line);
   } catch {
     return false;
@@ -395,7 +425,7 @@ export async function fixIssue(id: string, issue: ApiIssue, userKey?: string | n
           lineText,
           before,
           after,
-          language: issue.fileName.endsWith(".py") ? "Python" : "JavaScript/TypeScript",
+          language: languageForFile(issue.fileName),
         }, userKey);
         usedLLM = true;
       } catch (error) {
@@ -479,9 +509,12 @@ export async function fixIssue(id: string, issue: ApiIssue, userKey?: string | n
 function issuedUnfixableMessage(issue: ApiIssue): string {
   if (issue.fixAvailable === "auto") return "No safe automatic patch was found for this exact line.";
   if (issue.fixAvailable === "llm") {
-    return "This finding needs an AI fix, but no AI key is available. Add your own free Gemini key in Settings, or fix it manually.";
+    return "The AI could not produce a safe one-line fix for this finding. Please fix it manually in the code, or try again.";
   }
-  return "This finding cannot be auto-fixed (rotate the secret manually, or adjust the code by hand).";
+  if (issue.detector === "hardcoded-secret") {
+    return "This finding cannot be auto-fixed — move the secret to an environment variable and rotate it manually.";
+  }
+  return "This finding cannot be auto-fixed — please adjust the code by hand.";
 }
 
 /** Resolve the absolute path helper used by callers that need to re-read files. */
