@@ -120,6 +120,52 @@ const PY_DETECTORS: { name: string; severity: Severity; body: string }[] = [
   },
 ];
 
+const PHP_DETECTORS: { name: string; severity: Severity; body: string }[] = [
+  {
+    name: "SQL Query Built From User Input",
+    severity: "critical",
+    body: "Queries receiving request data or concatenated strings.",
+  },
+  {
+    name: "Shell Command From User Input",
+    severity: "critical",
+    body: "system() and similar functions fed straight from a request.",
+  },
+  {
+    name: "eval / create_function Used",
+    severity: "high",
+    body: "Strings executed as PHP code.",
+  },
+  {
+    name: "User Input Printed Without Escaping",
+    severity: "high",
+    body: "Request data echoed raw — reflected XSS.",
+  },
+  {
+    name: "File Include From a Variable",
+    severity: "high",
+    body: "include / require paths an attacker can steer.",
+  },
+];
+
+const JAVA_DETECTORS: { name: string; severity: Severity; body: string }[] = [
+  {
+    name: "SQL Built With String Concatenation",
+    severity: "critical",
+    body: "Queries assembled with + instead of PreparedStatement.",
+  },
+  {
+    name: "Runtime.exec With a Built Command",
+    severity: "high",
+    body: "Shell commands shaped by variables.",
+  },
+  {
+    name: "Unsafe Deserialization",
+    severity: "high",
+    body: "ObjectInputStream / XMLDecoder on untrusted data.",
+  },
+];
+
 const PRIVACY_POINTS: {
   icon: LucideIcon;
   title: string;
@@ -200,7 +246,7 @@ export function LandingPage() {
           <div className="min-w-0">
             <span className="inline-flex items-center gap-2 rounded-full border border-brand/25 bg-brand-dim px-3 py-1 text-xs font-medium text-brand">
               <ShieldCheck className="size-3.5" aria-hidden="true" />
-              Code security for JavaScript, TypeScript &amp; Python
+              Code security for JS, TS, Python, PHP, Java, C/C++ &amp; the web
             </span>
             <h1
               id="landing-title"
@@ -369,7 +415,34 @@ export function LandingPage() {
               </div>
             </CardContent>
           </Card>
+          <Card>
+            <CardContent className="p-5 sm:p-6">
+              <h3 className="font-semibold">PHP</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Line-based checks for the classic PHP vulnerability patterns.
+              </p>
+              <div className="mt-2">
+                <DetectorList items={PHP_DETECTORS} />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-5 sm:p-6">
+              <h3 className="font-semibold">Java</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Line-based checks for injection and unsafe deserialization.
+              </p>
+              <div className="mt-2">
+                <DetectorList items={JAVA_DETECTORS} />
+              </div>
+            </CardContent>
+          </Card>
         </div>
+        <p className="mt-4 text-sm text-muted-foreground">
+          C and C++ projects are checked for unbounded string functions,
+          built shell commands and variable format strings; HTML and CSS are
+          checked for plain-HTTP resources and unsafe embedding patterns.
+        </p>
         <p className="mt-4 text-sm text-muted-foreground">
           Scanning is deterministic and runs on ProofCode&rsquo;s servers.
           Nothing is sent to an AI provider during a scan. Code goes to a

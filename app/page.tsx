@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     absolute: "ProofCode — Don't just trust AI-generated code. Prove it.",
   },
   description:
-    "ProofCode scans JavaScript, TypeScript, and Python code for security issues, explains every finding, generates a fix, and re-scans to verify it, with a 0–100 security health score for every project. Free to use — sign in with Google.",
+    "ProofCode scans JavaScript, TypeScript, Python, PHP, Java, C/C++, HTML and CSS for security issues, explains every finding, generates a fix, and re-scans to verify it, with a 0–100 security health score for every project. Free to use — sign in with Google.",
   openGraph: {
     type: "website",
     siteName: "ProofCode",
@@ -22,19 +22,19 @@ export const metadata: Metadata = {
       "Scan your code for security issues, understand each finding, generate a fix, and verify it — with a 0–100 health score for every project.",
     images: [
       {
-        url: "/icon.svg",
-        width: 64,
-        height: 64,
-        alt: "ProofCode",
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "ProofCode — AI code security scanner",
       },
     ],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "ProofCode — Don't just trust AI-generated code. Prove it.",
     description:
       "Scan your code for security issues, understand each finding, generate a fix, and verify it — with a 0–100 health score for every project.",
-    images: ["/icon.svg"],
+    images: ["/opengraph-image"],
   },
 };
 

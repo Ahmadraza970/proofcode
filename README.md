@@ -33,6 +33,10 @@ flowchart LR
 2. **Analyze** — clones/unzips into an isolated workspace (with a zip-bomb budget) and scans:
    - **JavaScript/TypeScript** via a real AST (typescript-estree): SQL injection, XSS (`innerHTML` / `insertAdjacentHTML`), `eval` / `new Function`, command injection, sensitive-error exposure.
    - **Python** via heuristics: SQL injection, `eval`, `pickle`, shell execution, OS commands.
+   - **PHP** via line checks: SQL built from user input, shell commands from requests, `eval`, unescaped output, variable file includes.
+   - **Java** via line checks: concatenated SQL, `Runtime.exec` with built commands, unsafe deserialization.
+   - **C / C++** via line checks: unbounded string functions (`strcpy`, `gets`, `sprintf`), built `system()` commands, variable format strings.
+   - **HTML / CSS** via line checks: plain-HTTP resources, `target="_blank"` without `noopener`, unsandboxed iframes.
    - **Secrets**: hardcoded credential-like values (placeholder-style values such as `demo` / `*-free` dummies are ignored).
 3. **Find & explain** — each issue gets a severity, a plain-language why-it-matters, and a suggested fix.
 4. **Fix** — deterministic patches first (e.g. `innerHTML` → `textContent`); riskier findings can use an LLM rewrite (Gemini, or an OpenRouter-compatible API). Every fix is **verified by re-scanning the rewritten line** — nothing is called "fixed" unless the detector stops firing. You can optionally bring your own AI key (Settings → "Your own AI key"): it stays in your browser and is sent only with your own fix requests.
@@ -48,7 +52,7 @@ Health Score = `100 − Σ (open severity weights)`, floored at 5. Weights: crit
 | 60–74 | **At Risk** |
 | Below 60 | **Critical** |
 
-### The 11 checks
+### The 26 checks
 
 **JavaScript / TypeScript** — parsed with a real AST (typescript-estree):
 
@@ -70,6 +74,45 @@ Health Score = `100 − Σ (open severity weights)`, floored at 5. Weights: crit
 | Untrusted `pickle.loads` | High |
 | Shell Execution | High |
 | `os.system` / `popen` With Variable | Medium |
+
+**PHP** — line-based checks for the classic PHP patterns:
+
+| Check | Severity |
+|---|---|
+| SQL Query Built From User Input | Critical |
+| Shell Command From User Input | Critical |
+| `eval` / `create_function` Used | High |
+| User Input Printed Without Escaping | High |
+| File Include From a Variable | High |
+
+**Java** — line-based checks:
+
+| Check | Severity |
+|---|---|
+| SQL Built With String Concatenation | Critical |
+| `Runtime.exec` With a Built Command | High |
+| Unsafe Deserialization | High |
+
+**C / C++** — line-based checks:
+
+| Check | Severity |
+|---|---|
+| Unbounded String Function (`strcpy`, `gets`, `sprintf`) | High |
+| `system()` / `popen()` With a Built Command | High |
+| Variable Used as Format String | Medium |
+
+**HTML / CSS** — line-based checks:
+
+| Check | Severity |
+|---|---|
+| Resource Loaded Over Plain HTTP | Medium |
+| `target="_blank"` Without `rel="noopener"` | Low |
+| iframe Without `sandbox` | Low |
+| CSS Resource Over Plain HTTP | Low |
+
+A project whose files are all in a language ProofCode cannot read is reported
+honestly as **not scanned** — it never receives a health score, so an unscanned
+project can never be labelled clean.
 
 Scanning is deterministic and runs on ProofCode's servers — nothing is sent to an AI
 provider during a scan. Code goes to a provider only when you request an AI-generated fix.
